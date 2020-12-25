@@ -69,13 +69,7 @@ namespace osu.Server.Spectator.Hubs
             await base.OnConnectedAsync();
         }
 
-        protected override Task OnDisconnectedAsync(Exception exception, SpectatorState? state)
-        {
-            if (state != null)
-                return EndPlaySession(state);
-
-            return base.OnDisconnectedAsync(exception, state);
-        }
+        protected override Task CleanupPreviousState(SpectatorState state) => EndPlaySession(state);
 
         public static string GetGroupId(int userId) => $"watch:{userId}";
     }

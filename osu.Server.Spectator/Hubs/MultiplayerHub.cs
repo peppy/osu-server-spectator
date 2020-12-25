@@ -97,7 +97,7 @@ namespace osu.Server.Spectator.Hubs
                 await UpdateDatabaseParticipants(room);
             }
 
-            await UpdateLocalUserState(new MultiplayerClientState(roomId));
+            await UpdateLocalUserState(new MultiplayerClientState(roomId, Context.ConnectionId));
 
             await MarkRoomActive(room);
 
@@ -333,13 +333,7 @@ namespace osu.Server.Spectator.Hubs
             }
         }
 
-        protected override Task OnDisconnectedAsync(Exception exception, MultiplayerClientState? state)
-        {
-            if (state != null)
-                return LeaveRoom();
-
-            return base.OnDisconnectedAsync(exception, state);
-        }
+        protected override Task CleanupPreviousState(MultiplayerClientState state) => LeaveRoom();
 
         /// <summary>
         /// Get the group ID to be used for multiplayer messaging.

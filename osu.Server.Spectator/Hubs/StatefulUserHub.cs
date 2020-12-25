@@ -32,32 +32,63 @@ namespace osu.Server.Spectator.Hubs
         /// </summary>
         protected int CurrentContextUserId => int.Parse(Context.UserIdentifier);
 
-        public override Task OnConnectedAsync()
+        public override async Task OnConnectedAsync()
         {
             Console.WriteLine($"User {CurrentContextUserId} connected!");
 
-            return base.OnConnectedAsync();
+            await cleanupState(false);
+
+            await base.OnConnectedAsync();
         }
 
         /// <summary>
-        /// Called when a user disconnected, providing their last state.
+        /// Called when a user's previous state is no longer valid.
         /// </summary>
-        /// <param name="exception">A potential error which caused the disconnection.</param>
         /// <param name="state">The last user state. May be null. This is automatically cleared on disconnection.</param>
-        protected virtual Task OnDisconnectedAsync(Exception exception, TUserState? state) => Task.CompletedTask;
+        protected virtual Task CleanupPreviousState(TUserState state) => Task.CompletedTask;
 
         public sealed override async Task OnDisconnectedAsync(Exception exception)
         {
             Console.WriteLine($"User {CurrentContextUserId} disconnected!");
 
-            var state = await GetLocalUserState();
-
-            await OnDisconnectedAsync(exception, state);
-
-            // clean up user on disconnection
-            if (state != null) await RemoveLocalUserState();
+            await cleanupState(true);
 
             await base.OnDisconnectedAsync(exception);
+        }
+
+        private async Task cleanupState(bool isDisconnect)
+        {
+            var state = await GetLocalUserState();
+
+            if (state == null) return;
+
+            if (state is ClientState clientState)
+            {
+                if (isDisconnect)
+                {
+                    // if this is a disconnection, we only want to clean the state if it is our own.
+                    if (clientState.ConnectionId == Context.ConnectionId)
+                        await runCleanup();
+                }
+                else
+                {
+                    // in another scenario, we are looking to clear a state that is NOT our own.
+                    if (clientState.ConnectionId != Context.ConnectionId)
+                        await runCleanup();
+                }
+            }
+            else
+            {
+                // for cases the client state doesn't have a connection id, we cannot be sure of the owner so should just nuke it.
+                // this case can be removed once spectator hub is reworked to use ClientState as a base class.
+                await runCleanup();
+            }
+
+            async Task runCleanup()
+            {
+                await CleanupPreviousState(state);
+                await RemoveLocalUserState();
+            }
         }
 
         protected async Task UpdateLocalUserState(TUserState state)
