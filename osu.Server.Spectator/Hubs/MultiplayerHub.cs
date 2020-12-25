@@ -86,6 +86,10 @@ namespace osu.Server.Spectator.Hubs
 
             using (room.LockForUpdate())
             {
+                // should in theory be handled by the state check above, but this prevents a *room* getting in a bad state.
+                if (room.Users.Contains(roomUser))
+                    throw new InvalidStateException("Already joined to this room.");
+
                 room.Users.Add(roomUser);
                 await Clients.Group(GetGroupId(roomId)).UserJoined(roomUser);
                 await Groups.AddToGroupAsync(Context.ConnectionId, GetGroupId(roomId));
