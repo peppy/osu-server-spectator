@@ -9,12 +9,13 @@ using Newtonsoft.Json;
 namespace osu.Server.Spectator.Hubs
 {
     [Serializable]
-    public class MultiplayerClientState
+    public class MultiplayerClientState : ClientState
     {
         public readonly long CurrentRoomID;
 
         [JsonConstructor]
-        public MultiplayerClientState(in long currentRoomID)
+        public MultiplayerClientState(in long currentRoomID, in string connectionId)
+            : base(connectionId)
         {
             CurrentRoomID = currentRoomID;
         }
