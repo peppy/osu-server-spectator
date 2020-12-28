@@ -23,19 +23,21 @@ namespace osu.Server.Spectator.Hubs
         // for the time being rooms will be maintained in memory and not distributed.
         private static readonly Dictionary<long, MultiplayerRoom> active_rooms = new Dictionary<long, MultiplayerRoom>();
 
-        /// <summary>
-        /// Temporary method to reset in-memory storage (used only for tests).
-        /// </summary>
-        public static void Reset()
-        {
-            Console.WriteLine("Resetting ALL tracked rooms.");
-            lock (active_rooms)
-                active_rooms.Clear();
-        }
-
         public MultiplayerHub(IDistributedCache cache)
             : base(cache)
         {
+        }
+
+        /// <summary>
+        /// Temporary method to reset in-memory storage (used only for tests).
+        /// </summary>
+        public new static void Reset()
+        {
+            StatefulUserHub<IMultiplayerClient, MultiplayerClientState>.Reset();
+
+            Console.WriteLine("Resetting ALL tracked rooms.");
+            lock (active_rooms)
+                active_rooms.Clear();
         }
 
         /// <summary>

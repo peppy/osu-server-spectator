@@ -63,7 +63,7 @@ namespace osu.Server.Spectator.Hubs
         {
             // for now, send *all* player states to users on connect.
             // we don't want this for long, but while the lazer user base is small it should be okay.
-            foreach (var kvp in ACTIVE_STATES)
+            foreach (var kvp in GetAllStates())
                 await Clients.Caller.UserBeganPlaying(kvp.Key, kvp.Value);
 
             await base.OnConnectedAsync();

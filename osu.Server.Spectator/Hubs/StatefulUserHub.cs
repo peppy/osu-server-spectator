@@ -2,13 +2,13 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Caching.Distributed;
-using Newtonsoft.Json;
 
 namespace osu.Server.Spectator.Hubs
 {
@@ -18,13 +18,16 @@ namespace osu.Server.Spectator.Hubs
         where TUserState : class
         where TClient : class
     {
-        protected readonly IDistributedCache Cache;
-
-        protected static readonly ConcurrentDictionary<int, TUserState> ACTIVE_STATES = new ConcurrentDictionary<int, TUserState>();
+        private static readonly Dictionary<int, TUserState> active_states = new Dictionary<int, TUserState>();
 
         protected StatefulUserHub(IDistributedCache cache)
         {
-            this.Cache = cache;
+        }
+
+        protected static KeyValuePair<int, TUserState>[] GetAllStates()
+        {
+            lock (active_states)
+                return active_states.ToArray();
         }
 
         /// <summary>
@@ -91,36 +94,40 @@ namespace osu.Server.Spectator.Hubs
             }
         }
 
-        protected async Task UpdateLocalUserState(TUserState state)
+        protected Task UpdateLocalUserState(TUserState state)
         {
-            ACTIVE_STATES.TryRemove(CurrentContextUserId, out var _);
-            ACTIVE_STATES.TryAdd(CurrentContextUserId, state);
+            lock (active_states)
+                active_states[CurrentContextUserId] = state;
 
-            await Cache.SetStringAsync(GetStateId(CurrentContextUserId), JsonConvert.SerializeObject(state));
+            return Task.CompletedTask;
         }
 
         protected Task<TUserState?> GetLocalUserState() => GetStateFromUser(CurrentContextUserId);
 
-        protected async Task RemoveLocalUserState()
+        protected Task RemoveLocalUserState()
         {
-            ACTIVE_STATES.TryRemove(CurrentContextUserId, out var _);
+            lock (active_states)
+                active_states.Remove(CurrentContextUserId);
 
-            await Cache.RemoveAsync(GetStateId(CurrentContextUserId));
+            return Task.CompletedTask;
         }
 
-        protected async Task<TUserState?> GetStateFromUser(int userId)
+        protected Task<TUserState?> GetStateFromUser(int userId)
         {
-            var jsonString = await Cache.GetStringAsync(GetStateId(userId));
+            TUserState? state;
 
-            if (jsonString == null)
-                return null;
+            lock (active_states)
+                active_states.TryGetValue(userId, out state);
 
-            // todo: error checking logic?
-            var state = JsonConvert.DeserializeObject<TUserState>(jsonString);
-
-            return state;
+            return Task.FromResult(state);
         }
 
         public static string GetStateId(int userId) => $"state-{typeof(TClient)}:{userId}";
+
+        public static void Reset()
+        {
+            lock (active_states)
+                active_states.Clear();
+        }
     }
 }
