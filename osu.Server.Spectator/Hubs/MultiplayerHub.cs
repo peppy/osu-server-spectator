@@ -61,7 +61,7 @@ namespace osu.Server.Spectator.Hubs
                 throw new InvalidStateException("Can't join a room when restricted.");
             }
 
-            var state = await GetLocalUserState();
+            var state = GetLocalUserState();
 
             if (state != null)
             {
@@ -75,14 +75,19 @@ namespace osu.Server.Spectator.Hubs
             // check whether we are already aware of this match.
             if (!TryGetRoom(roomId, out var room))
             {
-                room = await RetrieveRoom(roomId);
-
-                room.Host = roomUser;
+                var dbRoom = await RetrieveRoom(roomId);
+                dbRoom.Host = roomUser;
 
                 lock (active_rooms)
                 {
-                    Console.WriteLine($"Tracking new room {roomId}.");
-                    active_rooms.Add(roomId, room);
+                    // do a second check under the room lock. things may have changed since the database retrieval completed.
+                    if (!TryGetRoom(roomId, out room))
+                    {
+                        Console.WriteLine($"Tracking new room {roomId}.");
+
+                        active_rooms.Add(roomId, dbRoom);
+                        room = dbRoom;
+                    }
                 }
             }
 
@@ -99,7 +104,7 @@ namespace osu.Server.Spectator.Hubs
                 await UpdateDatabaseParticipants(room);
             }
 
-            await UpdateLocalUserState(new MultiplayerClientState(roomId, Context.ConnectionId));
+            UpdateLocalUserState(new MultiplayerClientState(roomId));
 
             await MarkRoomActive(room);
 
@@ -170,16 +175,25 @@ namespace osu.Server.Spectator.Hubs
 
         public async Task LeaveRoom()
         {
-            var room = await getLocalUserRoom();
+            var room = getLocalUserRoom();
 
-            await RemoveLocalUserState();
+            UpdateLocalUserState(null);
+            await LeaveRoom(CurrentContextUserId, room);
 
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, GetGroupId(room.RoomID, true));
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, GetGroupId(room.RoomID));
+        }
 
+        /// <summary>
+        /// Attempt to part a specified user from the specified room.
+        /// </summary>
+        /// <param name="userId">The user which should leave.</param>
+        /// <param name="room">The room which the user should leave.</param>
+        protected async Task LeaveRoom(int userId, MultiplayerRoom room)
+        {
             using (room.LockForUpdate())
             {
-                var user = room.Users.Find(u => u.UserID == CurrentContextUserId);
+                var user = room.Users.Find(u => u.UserID == userId);
 
                 if (user == null)
                     failWithInvalidState("User was not in the expected room.");
@@ -218,7 +232,7 @@ namespace osu.Server.Spectator.Hubs
 
         public async Task TransferHost(int userId)
         {
-            var room = await getLocalUserRoom();
+            var room = getLocalUserRoom();
 
             using (room.LockForUpdate())
             {
@@ -235,7 +249,7 @@ namespace osu.Server.Spectator.Hubs
 
         public async Task ChangeState(MultiplayerUserState newState)
         {
-            var room = await getLocalUserRoom();
+            var room = getLocalUserRoom();
 
             using (room.LockForUpdate())
             {
@@ -271,7 +285,7 @@ namespace osu.Server.Spectator.Hubs
 
         public async Task StartMatch()
         {
-            var room = await getLocalUserRoom();
+            var room = getLocalUserRoom();
 
             ensureIsHost(room);
 
@@ -301,7 +315,7 @@ namespace osu.Server.Spectator.Hubs
 
         public async Task ChangeSettings(MultiplayerRoomSettings settings)
         {
-            var room = await getLocalUserRoom();
+            var room = getLocalUserRoom();
 
             using (room.LockForUpdate())
             {
@@ -584,9 +598,9 @@ namespace osu.Server.Spectator.Hubs
         /// <summary>
         /// Retrieve the <see cref="MultiplayerRoom"/> for the local context user.
         /// </summary>
-        private async Task<MultiplayerRoom> getLocalUserRoom()
+        private MultiplayerRoom getLocalUserRoom()
         {
-            var state = await GetLocalUserState();
+            var state = GetLocalUserState();
 
             if (state == null)
                 throw new NotJoinedRoomException();

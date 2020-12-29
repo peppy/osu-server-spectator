@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
@@ -18,7 +19,7 @@ namespace osu.Server.Spectator.Hubs
         where TUserState : class
         where TClient : class
     {
-        private static readonly Dictionary<int, TUserState> active_states = new Dictionary<int, TUserState>();
+        private static readonly Dictionary<int, ClientState<TUserState>> connected_users = new Dictionary<int, ClientState<TUserState>>();
 
         protected StatefulUserHub(IDistributedCache cache)
         {
@@ -26,8 +27,16 @@ namespace osu.Server.Spectator.Hubs
 
         protected static KeyValuePair<int, TUserState>[] GetAllStates()
         {
-            lock (active_states)
-                return active_states.ToArray();
+            lock (connected_users)
+            {
+                return connected_users
+                       .Where(kvp => kvp.Value.UserState != null)
+                       .Select(state =>
+                       {
+                           Debug.Assert(state.Value.UserState != null);
+                           return new KeyValuePair<int, TUserState>(state.Key, state.Value.UserState);
+                       }).ToArray();
+            }
         }
 
         /// <summary>
@@ -39,7 +48,8 @@ namespace osu.Server.Spectator.Hubs
         {
             Console.WriteLine($"User {CurrentContextUserId} connected!");
 
-            await cleanupState(false);
+            // return this user to a fresh state by destroying any associated state, regardless of the connection.
+            await ClearLocalUserState();
 
             await base.OnConnectedAsync();
         }
@@ -54,80 +64,74 @@ namespace osu.Server.Spectator.Hubs
         {
             Console.WriteLine($"User {CurrentContextUserId} disconnected!");
 
-            await cleanupState(true);
+            await ClearLocalUserState();
 
             await base.OnDisconnectedAsync(exception);
         }
 
-        private async Task cleanupState(bool isDisconnect)
+        /// <summary>
+        /// Update an associated user state. Setting to null clears the state.
+        /// </summary>
+        protected void UpdateLocalUserState(TUserState? state)
         {
-            var state = await GetLocalUserState();
-
-            if (state == null) return;
-
-            if (state is ClientState clientState)
+            lock (connected_users)
             {
-                if (isDisconnect)
+                if (connected_users.TryGetValue(CurrentContextUserId, out var clientState))
+                    clientState.SetUserState(state);
+            }
+        }
+
+        protected TUserState? GetLocalUserState() => GetStateFromUser(CurrentContextUserId);
+
+        /// <summary>
+        /// Remove any state for the current user across *all connections*.
+        /// This can be used to achieve a consistent state on connection or disconnection.
+        /// </summary>
+        /// <param name="createFresh">Whether a fresh state should be created after clearing any existing state. If true, it is guaranteed that the local connection holds the active state after completion.</param>
+        protected Task ClearLocalUserState(bool createFresh = false)
+        {
+            while (true)
+            {
+                ClientState<TUserState>? clientState;
+
+                lock (connected_users)
                 {
-                    // if this is a disconnection, we only want to clean the state if it is our own.
-                    if (clientState.ConnectionId == Context.ConnectionId)
-                        await runCleanup();
+                    connected_users.TryGetValue(CurrentContextUserId, out clientState);
+
+                    clientState.Invalidate();
                 }
-                else
+
+                if (clientState != null)
                 {
-                    // in another scenario, we are looking to clear a state that is NOT our own.
-                    if (clientState.ConnectionId != Context.ConnectionId)
-                        await runCleanup();
+                    {
+                        // there is an existing state
+                        // we need to clean it up.
+                    }
                 }
+
+                connected_users.Remove(CurrentContextUserId);
             }
-            else
+
+            return CleanupPreviousState(state);
+        }
+
+        protected TUserState? GetStateFromUser(int userId)
+        {
+            lock (connected_users)
             {
-                // for cases the client state doesn't have a connection id, we cannot be sure of the owner so should just nuke it.
-                // this case can be removed once spectator hub is reworked to use ClientState as a base class.
-                await runCleanup();
+                if (connected_users.TryGetValue(userId, out var clientState))
+                    return clientState.State;
             }
 
-            async Task runCleanup()
-            {
-                await CleanupPreviousState(state);
-                await RemoveLocalUserState();
-            }
-        }
-
-        protected Task UpdateLocalUserState(TUserState state)
-        {
-            lock (active_states)
-                active_states[CurrentContextUserId] = state;
-
-            return Task.CompletedTask;
-        }
-
-        protected Task<TUserState?> GetLocalUserState() => GetStateFromUser(CurrentContextUserId);
-
-        protected Task RemoveLocalUserState()
-        {
-            lock (active_states)
-                active_states.Remove(CurrentContextUserId);
-
-            return Task.CompletedTask;
-        }
-
-        protected Task<TUserState?> GetStateFromUser(int userId)
-        {
-            TUserState? state;
-
-            lock (active_states)
-                active_states.TryGetValue(userId, out state);
-
-            return Task.FromResult(state);
+            return null;
         }
 
         public static string GetStateId(int userId) => $"state-{typeof(TClient)}:{userId}";
 
         public static void Reset()
         {
-            lock (active_states)
-                active_states.Clear();
+            lock (connected_users)
+                connected_users.Clear();
         }
     }
 }

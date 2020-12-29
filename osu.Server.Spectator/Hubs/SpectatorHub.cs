@@ -18,7 +18,7 @@ namespace osu.Server.Spectator.Hubs
 
         public async Task BeginPlaySession(SpectatorState state)
         {
-            await UpdateLocalUserState(state);
+            UpdateLocalUserState(state);
 
             Console.WriteLine($"User {CurrentContextUserId} beginning play session ({state})");
 
@@ -35,7 +35,7 @@ namespace osu.Server.Spectator.Hubs
         {
             Console.WriteLine($"User {CurrentContextUserId} ending play session ({state})");
 
-            await RemoveLocalUserState();
+            UpdateLocalUserState(null);
             await Clients.All.UserFinishedPlaying(CurrentContextUserId, state);
         }
 
@@ -44,7 +44,7 @@ namespace osu.Server.Spectator.Hubs
             Console.WriteLine($"User {CurrentContextUserId} watching {userId}");
 
             // send the user's state if exists
-            var state = await GetStateFromUser(userId);
+            var state = GetStateFromUser(userId);
 
             if (state != null)
             {
