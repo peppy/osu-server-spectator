@@ -112,16 +112,19 @@ namespace osu.Server.Spectator.Hubs
                 connected_users.Remove(CurrentContextUserId);
             }
 
-            return CleanupPreviousState(state);
+            // todo: unbreak
+            // return CleanupPreviousState(state);
+            return Task.CompletedTask;
         }
 
         protected TUserState? GetStateFromUser(int userId)
         {
-            lock (connected_users)
-            {
-                if (connected_users.TryGetValue(userId, out var clientState))
-                    return clientState.State;
-            }
+            // todo: unbreak
+            // lock (connected_users)
+            // {
+            //     if (connected_users.TryGetValue(userId, out var clientState))
+            //         return clientState.State;
+            // }
 
             return null;
         }
