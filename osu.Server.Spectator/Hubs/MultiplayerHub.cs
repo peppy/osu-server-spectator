@@ -11,6 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Extensions.Caching.Distributed;
+using MySqlConnector;
 using Newtonsoft.Json;
 using osu.Game.Online.API;
 using osu.Game.Online.RealtimeMultiplayer;
@@ -74,10 +75,12 @@ namespace osu.Server.Spectator.Hubs
                     if (room.Users.Any(u => u.UserID == roomUser.UserID))
                         throw new InvalidOperationException($"User {roomUser.UserID} attempted to join a room they are already present in.");
 
+                    // mark the room active - and wait for confirmation of this operation from the database - before adding the user to the room.
+                    await MarkRoomActive(room);
+
                     room.Users.Add(roomUser);
 
                     await UpdateDatabaseParticipants(room);
-                    await MarkRoomActive(room);
                 }
 
                 await Clients.Group(GetGroupId(roomId)).UserJoined(roomUser);
@@ -392,33 +395,40 @@ namespace osu.Server.Spectator.Hubs
 
         protected virtual async Task UpdateDatabaseParticipants(MultiplayerRoom room)
         {
-            using (var conn = Database.GetConnection())
+            try
             {
-                using (var transaction = await conn.BeginTransactionAsync())
+                using (var conn = Database.GetConnection())
                 {
-                    // This should be considered *very* temporary, and for display purposes only!
-                    await conn.ExecuteAsync("DELETE FROM multiplayer_rooms_high WHERE room_id = @RoomID", new
+                    using (var transaction = await conn.BeginTransactionAsync())
                     {
-                        RoomID = room.RoomID
-                    }, transaction);
-
-                    foreach (var u in room.Users)
-                    {
-                        await conn.ExecuteAsync("INSERT INTO multiplayer_rooms_high (room_id, user_id) VALUES (@RoomID, @UserID)", new
+                        // This should be considered *very* temporary, and for display purposes only!
+                        await conn.ExecuteAsync("DELETE FROM multiplayer_rooms_high WHERE room_id = @RoomID", new
                         {
-                            RoomID = room.RoomID,
-                            UserID = u.UserID
+                            RoomID = room.RoomID
                         }, transaction);
+
+                        foreach (var u in room.Users)
+                        {
+                            await conn.ExecuteAsync("INSERT INTO multiplayer_rooms_high (room_id, user_id) VALUES (@RoomID, @UserID)", new
+                            {
+                                RoomID = room.RoomID,
+                                UserID = u.UserID
+                            }, transaction);
+                        }
+
+                        await transaction.CommitAsync();
                     }
 
-                    await transaction.CommitAsync();
+                    await conn.ExecuteAsync("UPDATE multiplayer_rooms SET participant_count = @Count WHERE id = @RoomID", new
+                    {
+                        RoomID = room.RoomID,
+                        Count = room.Users.Count
+                    });
                 }
-
-                await conn.ExecuteAsync("UPDATE multiplayer_rooms SET participant_count = @Count WHERE id = @RoomID", new
-                {
-                    RoomID = room.RoomID,
-                    Count = room.Users.Count
-                });
+            }
+            catch (MySqlException)
+            {
+                // for now we really don't care about failures in this. it's updating display information each time a user joins/quits and doesn't need to be perfect.
             }
         }
 
@@ -584,19 +594,19 @@ namespace osu.Server.Spectator.Hubs
                 if (user == null)
                     failWithInvalidState("User was not in the expected room.");
 
-                room.Users.Remove(user);
-
-                await UpdateDatabaseParticipants(room);
-
-                if (room.Users.Count == 0)
+                // handle closing the room if the only participant is the user which is leaving.
+                if (room.Users.Count == 1)
                 {
-                    Console.WriteLine($"Stopping tracking of room {room.RoomID} (all users left).");
-                    roomUsage.Destroy();
-
                     await EndDatabaseMatch(room);
 
+                    // only destroy the usage after the database operation succeeds.
+                    Console.WriteLine($"Stopping tracking of room {room.RoomID} (all users left).");
+                    roomUsage.Destroy();
                     return;
                 }
+
+                room.Users.Remove(user);
+                await UpdateDatabaseParticipants(room);
 
                 var clients = Clients.Group(GetGroupId(room.RoomID));
 
