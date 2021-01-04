@@ -6,7 +6,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
@@ -206,7 +205,7 @@ namespace osu.Server.Spectator.Hubs
                 var user = room.Users.Find(u => u.UserID == CurrentContextUserId);
 
                 if (user == null)
-                    failWithInvalidState("Local user was not found in the expected room");
+                    throw new InvalidStateException("Local user was not found in the expected room");
 
                 if (user.State == newState)
                     return;
@@ -361,13 +360,20 @@ namespace osu.Server.Spectator.Hubs
         {
             Debug.Assert(room.Host != null);
 
-            using (var conn = Database.GetConnection())
+            try
             {
-                await conn.ExecuteAsync("UPDATE multiplayer_rooms SET user_id = @HostUserID WHERE id = @RoomID", new
+                using (var conn = Database.GetConnection())
                 {
-                    HostUserID = room.Host.UserID,
-                    RoomID = room.RoomID
-                });
+                    await conn.ExecuteAsync("UPDATE multiplayer_rooms SET user_id = @HostUserID WHERE id = @RoomID", new
+                    {
+                        HostUserID = room.Host.UserID,
+                        RoomID = room.RoomID
+                    });
+                }
+            }
+            catch (MySqlException)
+            {
+                // for now we really don't care about failures in this. it's updating display information each time a user joins/quits and doesn't need to be perfect.
             }
         }
 
@@ -441,10 +447,10 @@ namespace osu.Server.Spectator.Hubs
         private async Task setNewHost(MultiplayerRoom room, MultiplayerRoomUser newHost)
         {
             room.Host = newHost;
+            await Clients.Group(GetGroupId(room.RoomID)).HostChanged(newHost.UserID);
+
 
             await UpdateDatabaseHost(room);
-
-            await Clients.Group(GetGroupId(room.RoomID)).HostChanged(newHost.UserID);
         }
 
         /// <summary>
@@ -592,7 +598,7 @@ namespace osu.Server.Spectator.Hubs
                 var user = room.Users.Find(u => u.UserID == state.UserId);
 
                 if (user == null)
-                    failWithInvalidState("User was not in the expected room.");
+                    throw new InvalidStateException("User was not in the expected room.");
 
                 // handle closing the room if the only participant is the user which is leaving.
                 if (room.Users.Count == 1)
@@ -622,9 +628,5 @@ namespace osu.Server.Spectator.Hubs
                 await clients.UserLeft(user);
             }
         }
-
-        [ExcludeFromCodeCoverage]
-        [DoesNotReturn]
-        private void failWithInvalidState(string message) => throw new InvalidStateException(message);
     }
 }
