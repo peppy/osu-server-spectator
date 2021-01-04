@@ -85,6 +85,7 @@ namespace osu.Server.Spectator.Hubs
                     await Groups.AddToGroupAsync(Context.ConnectionId, GetGroupId(roomId));
 
                     userUsage.Item = new MultiplayerClientState(Context.ConnectionId, CurrentContextUserId, roomId);
+                    Log($"Joining room {room.RoomID}");
                 }
 
                 return room;
@@ -144,6 +145,8 @@ namespace osu.Server.Spectator.Hubs
         /// </summary>
         protected virtual async Task MarkRoomActive(MultiplayerRoom room)
         {
+            Log($"Host marking room active {room.RoomID}");
+
             using (var conn = Database.GetConnection())
             {
                 await conn.ExecuteAsync("UPDATE multiplayer_rooms SET ends_at = null WHERE id = @RoomID", new
@@ -449,7 +452,6 @@ namespace osu.Server.Spectator.Hubs
             room.Host = newHost;
             await Clients.Group(GetGroupId(room.RoomID)).HostChanged(newHost.UserID);
 
-
             await UpdateDatabaseHost(room);
         }
 
@@ -592,6 +594,8 @@ namespace osu.Server.Spectator.Hubs
                 if (room == null)
                     throw new InvalidOperationException("Attempted to operate on a null room");
 
+                Log($"Leaving room {room.RoomID}");
+
                 await Groups.RemoveFromGroupAsync(state.ConnectionId, GetGroupId(room.RoomID, true));
                 await Groups.RemoveFromGroupAsync(state.ConnectionId, GetGroupId(room.RoomID));
 
@@ -606,7 +610,7 @@ namespace osu.Server.Spectator.Hubs
                     await EndDatabaseMatch(room);
 
                     // only destroy the usage after the database operation succeeds.
-                    Console.WriteLine($"Stopping tracking of room {room.RoomID} (all users left).");
+                    Log($"Stopping tracking of room {room.RoomID} (all users left).");
                     roomUsage.Destroy();
                     return;
                 }
