@@ -41,7 +41,7 @@ namespace osu.Server.Spectator.Hubs
                 // if a previous connection is still present for the current user, we need to clean it up.
                 await cleanUpState(false);
             }
-            catch (Exception e)
+            catch
             {
                 Log("State cleanup failed");
 
@@ -122,8 +122,6 @@ namespace osu.Server.Spectator.Hubs
 
         protected Task<ItemUsage<TUserState>> GetStateFromUser(int userId) =>
             ACTIVE_STATES.GetForUse(userId);
-
-        public static string GetStateId(int userId) => $"state-{typeof(TClient)}:{userId}";
 
         public static void Reset() => ACTIVE_STATES.Clear();
 
