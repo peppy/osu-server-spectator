@@ -1,6 +1,8 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -54,7 +56,7 @@ namespace osu.Server.Spectator.Hubs
             await base.OnConnectedAsync();
         }
 
-        public sealed override async Task OnDisconnectedAsync(Exception exception)
+        public sealed override async Task OnDisconnectedAsync(Exception? exception)
         {
             Log("Disconnected");
 
@@ -77,28 +79,33 @@ namespace osu.Server.Spectator.Hubs
 
             Log($"Cleaning up state on {(isDisconnect ? "disconnect" : "connect")}");
 
-            if (usage.Item != null)
+            try
             {
-                bool isOurState = usage.Item.ConnectionId == Context.ConnectionId;
-
-                if (isDisconnect && !isOurState)
+                if (usage.Item != null)
                 {
-                    // not our state, owned by a different connection.
-                    Log("Disconnect state cleanup aborted due to newer connection owning state");
-                    return;
-                }
+                    bool isOurState = usage.Item.ConnectionId == Context.ConnectionId;
 
-                try
-                {
-                    await CleanUpState(usage.Item);
-                }
-                finally
-                {
-                    usage.Destroy();
-                    usage.Dispose();
+                    if (isDisconnect && !isOurState)
+                    {
+                        // not our state, owned by a different connection.
+                        Log("Disconnect state cleanup aborted due to newer connection owning state");
+                        return;
+                    }
 
-                    Log("State cleanup completed");
+                    try
+                    {
+                        await CleanUpState(usage.Item);
+                    }
+                    finally
+                    {
+                        usage.Destroy();
+                        Log("State cleanup completed");
+                    }
                 }
+            }
+            finally
+            {
+                usage.Dispose();
             }
         }
 
