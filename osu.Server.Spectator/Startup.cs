@@ -26,6 +26,8 @@ namespace osu.Server.Spectator
 
             services.AddDatabaseServices();
 
+            services.AddControllers();
+
             services.AddDistributedMemoryCache(); // replace with redis
 
             services.AddLogging(logging =>
@@ -72,6 +74,7 @@ namespace osu.Server.Spectator
 
             app.UseEndpoints(endpoints => { endpoints.MapHub<SpectatorHub>("/spectator"); });
             app.UseEndpoints(endpoints => { endpoints.MapHub<MultiplayerHub>("/multiplayer"); });
+            app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
         }
     }
 }
