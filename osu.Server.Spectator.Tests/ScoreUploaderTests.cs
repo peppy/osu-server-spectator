@@ -23,7 +23,7 @@ namespace osu.Server.Spectator.Tests
         public ScoreUploaderTests()
         {
             mockDatabase = new Mock<IDatabaseAccess>();
-            mockDatabase.Setup(db => db.GetScoreFromToken(1)).Returns(Task.FromResult<SoloScore?>(new SoloScore
+            mockDatabase.Setup(db => db.GetScoreFromId(1)).Returns(Task.FromResult<SoloScore?>(new SoloScore
             {
                 ScoreInfo =
                 {
@@ -88,7 +88,7 @@ namespace osu.Server.Spectator.Tests
             mockStorage.Verify(s => s.WriteAsync(It.IsAny<Score>()), Times.Never);
 
             // Give the score a token.
-            mockDatabase.Setup(db => db.GetScoreFromToken(2)).Returns(Task.FromResult<SoloScore?>(new SoloScore
+            mockDatabase.Setup(db => db.GetScoreFromId(2)).Returns(Task.FromResult<SoloScore?>(new SoloScore
             {
                 ScoreInfo =
                 {
@@ -116,7 +116,7 @@ namespace osu.Server.Spectator.Tests
             mockStorage.Verify(s => s.WriteAsync(It.IsAny<Score>()), Times.Never);
 
             // Give the score a token now. It should still not upload because it has timed out.
-            mockDatabase.Setup(db => db.GetScoreFromToken(2)).Returns(Task.FromResult<SoloScore?>(new SoloScore
+            mockDatabase.Setup(db => db.GetScoreFromId(2)).Returns(Task.FromResult<SoloScore?>(new SoloScore
             {
                 ScoreInfo =
                 {

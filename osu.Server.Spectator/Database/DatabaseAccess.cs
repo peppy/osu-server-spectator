@@ -293,15 +293,23 @@ namespace osu.Server.Spectator.Database
             });
         }
 
-        public async Task<SoloScore?> GetScoreFromToken(long token)
+        public async Task<bool> ValidateScoreTokenIdPair(long token, long scoreId)
         {
             var connection = await getConnectionAsync();
 
-            return await connection.QuerySingleOrDefaultAsync<SoloScore?>(
-                "SELECT * FROM `solo_scores` WHERE `id` = (SELECT `score_id` FROM `solo_score_tokens` WHERE `id` = @Id)", new
+            // Importantly, even though the user is sending an ID, we want to double-check it matches the original token.
+            return (await connection.QuerySingleOrDefaultAsync<SoloScore?>(
+                "SELECT `score_id` FROM `solo_score_tokens` WHERE `id` = @token", new
                 {
-                    Id = token
-                });
+                    token,
+                }))?.ScoreInfo.OnlineID == scoreId;
+        }
+
+        public async Task<SoloScore?> GetScoreFromId(long scoreId)
+        {
+            var connection = await getConnectionAsync();
+
+            return await connection.QuerySingleOrDefaultAsync<SoloScore?>("SELECT * FROM `solo_scores` WHERE `id` = @scoreId", new { scoreId });
         }
 
         public async Task<bool> IsScoreProcessedAsync(long scoreId)

@@ -78,13 +78,13 @@ namespace osu.Server.Spectator.Hubs.Spectator
             }
         }
 
-        public async Task RegisterForNotificationAsync(string receiverConnectionId, int userId, long scoreToken)
+        public async Task RegisterForNotificationAsync(string receiverConnectionId, int userId, long scoreId)
         {
             try
             {
                 using var db = databaseFactory.GetInstance();
 
-                SoloScore? score = await db.GetScoreFromToken(scoreToken);
+                SoloScore? score = await db.GetScoreFromId(scoreId);
 
                 if (score == null)
                 {
@@ -110,7 +110,7 @@ namespace osu.Server.Spectator.Hubs.Spectator
             }
             catch (Exception ex)
             {
-                logger.Add($"Failed to register connection {receiverConnectionId} for info about score {userId}:{scoreToken}", LogLevel.Error, ex);
+                logger.Add($"Failed to register connection {receiverConnectionId} for info about score {userId}:{scoreId}", LogLevel.Error, ex);
                 DogStatsd.Increment($"{statsd_prefix}.subscriptions.failed");
             }
         }

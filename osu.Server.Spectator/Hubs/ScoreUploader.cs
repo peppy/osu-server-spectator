@@ -57,10 +57,9 @@ namespace osu.Server.Spectator.Hubs
         /// <summary>
         /// Enqueues a new score to be uploaded.
         /// </summary>
-        /// <param name="token">The score's token.</param>
         /// <param name="scoreId">The score's ID.</param>
         /// <param name="score">The score.</param>
-        public void Enqueue(long token, long scoreId, Score score)
+        public void Enqueue(long scoreId, Score score)
         {
             if (!AppSettings.SaveReplays)
                 return;
@@ -70,7 +69,7 @@ namespace osu.Server.Spectator.Hubs
             var cancellation = new CancellationTokenSource();
             cancellation.CancelAfter(TimeSpan.FromMilliseconds(TimeoutInterval));
 
-            queue.Enqueue(new UploadItem(token, scoreId, score, cancellation));
+            queue.Enqueue(new UploadItem(scoreId, score, cancellation));
         }
 
         /// <summary>
@@ -92,20 +91,19 @@ namespace osu.Server.Spectator.Hubs
                         if (!queue.TryDequeue(out var item))
                             continue;
 
-                        SoloScore? dbScore = await db.GetScoreFromToken(item.Token);
+                        SoloScore? dbScore = await db.GetScoreFromId(item.ScoreId);
 
                         if (dbScore == null && !item.Cancellation.IsCancellationRequested)
                         {
-                            // Score is not ready yet - enqueue for the next attempt.
-                            queue.Enqueue(item);
-                            continue;
+                            Console.WriteLine($"Score not found for ID: {item.ScoreId}");
+                            return;
                         }
 
                         try
                         {
                             if (dbScore == null)
                             {
-                                Console.WriteLine($"Score upload timed out for token: {item.Token}");
+                                Console.WriteLine($"Score upload timed out for token: {item.ScoreId}");
                                 return;
                             }
 
@@ -146,14 +144,12 @@ namespace osu.Server.Spectator.Hubs
 
         private class UploadItem : IDisposable
         {
-            public long Token { get; }
-            public long ScoreId { get; init; }
+            public long ScoreId { get; }
             public Score Score { get; }
             public CancellationTokenSource Cancellation { get; }
 
-            public UploadItem(long token, long scoreId, Score score, CancellationTokenSource cancellation)
+            public UploadItem(long scoreId, Score score, CancellationTokenSource cancellation)
             {
-                Token = token;
                 ScoreId = scoreId;
                 Score = score;
                 Cancellation = cancellation;

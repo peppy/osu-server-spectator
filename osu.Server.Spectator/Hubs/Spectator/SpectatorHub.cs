@@ -122,6 +122,7 @@ namespace osu.Server.Spectator.Hubs.Spectator
         public async Task EndPlaySession(long? scoreId, SpectatorState state)
         {
             using (var usage = await GetOrCreateLocalUserState())
+            using (var db = databaseFactory.GetInstance())
             {
                 try
                 {
@@ -140,8 +141,12 @@ namespace osu.Server.Spectator.Hubs.Spectator
 
                     score.ScoreInfo.Date = DateTimeOffset.UtcNow;
 
-                    scoreUploader.Enqueue(scoreToken.Value, scoreId.Value, score);
-                    await scoreProcessedSubscriber.RegisterForNotificationAsync(Context.ConnectionId, CurrentContextUserId, scoreToken.Value);
+                    // Verify the score id sent by the user matches the original token submission
+                    if (await db.ValidateScoreTokenIdPair(scoreToken.Value, scoreId.Value))
+                    {
+                        scoreUploader.Enqueue(scoreId.Value, score);
+                        await scoreProcessedSubscriber.RegisterForNotificationAsync(Context.ConnectionId, CurrentContextUserId, scoreId.Value);
+                    }
                 }
                 finally
                 {

@@ -123,9 +123,11 @@ namespace osu.Server.Spectator.Database
         /// <summary>
         /// Retrieves the <see cref="SoloScore"/> for a given score token. Will return null while the score has not yet been submitted.
         /// </summary>
-        /// <param name="token">The score token.</param>
+        /// <param name="scoreId">The score ID.</param>
         /// <returns>The <see cref="SoloScore"/>.</returns>
-        Task<SoloScore?> GetScoreFromToken(long token);
+        Task<SoloScore?> GetScoreFromId(long scoreId);
+
+        Task<bool> ValidateScoreTokenIdPair(long token, long scoreId);
 
         /// <summary>
         /// Returns <see langword="true"/> if the score with the supplied <paramref name="scoreId"/> has been successfully processed.
