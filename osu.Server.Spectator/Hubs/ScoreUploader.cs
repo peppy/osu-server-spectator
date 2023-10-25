@@ -58,8 +58,9 @@ namespace osu.Server.Spectator.Hubs
         /// Enqueues a new score to be uploaded.
         /// </summary>
         /// <param name="token">The score's token.</param>
+        /// <param name="scoreId">The score's ID.</param>
         /// <param name="score">The score.</param>
-        public void Enqueue(long token, Score score)
+        public void Enqueue(long token, long scoreId, Score score)
         {
             if (!AppSettings.SaveReplays)
                 return;
@@ -69,7 +70,7 @@ namespace osu.Server.Spectator.Hubs
             var cancellation = new CancellationTokenSource();
             cancellation.CancelAfter(TimeSpan.FromMilliseconds(TimeoutInterval));
 
-            queue.Enqueue(new UploadItem(token, score, cancellation));
+            queue.Enqueue(new UploadItem(token, scoreId, score, cancellation));
         }
 
         /// <summary>
@@ -143,8 +144,21 @@ namespace osu.Server.Spectator.Hubs
             cancellationSource.Dispose();
         }
 
-        private record UploadItem(long Token, Score Score, CancellationTokenSource Cancellation) : IDisposable
+        private class UploadItem : IDisposable
         {
+            public long Token { get; }
+            public long ScoreId { get; init; }
+            public Score Score { get; }
+            public CancellationTokenSource Cancellation { get; }
+
+            public UploadItem(long token, long scoreId, Score score, CancellationTokenSource cancellation)
+            {
+                Token = token;
+                ScoreId = scoreId;
+                Score = score;
+                Cancellation = cancellation;
+            }
+
             public void Dispose()
             {
                 Cancellation.Dispose();

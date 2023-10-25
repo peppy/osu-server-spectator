@@ -119,7 +119,7 @@ namespace osu.Server.Spectator.Hubs.Spectator
             }
         }
 
-        public async Task EndPlaySession(SpectatorState state)
+        public async Task EndPlaySession(long? scoreId, SpectatorState state)
         {
             using (var usage = await GetOrCreateLocalUserState())
             {
@@ -130,7 +130,7 @@ namespace osu.Server.Spectator.Hubs.Spectator
 
                     // Score may be null if the BeginPlaySession call failed but the client is still sending frame data.
                     // For now it's safe to drop these frames.
-                    if (score == null || scoreToken == null)
+                    if (score == null || scoreToken == null || scoreId == null)
                         return;
 
                     // Do nothing with scores on unranked beatmaps.
@@ -140,7 +140,7 @@ namespace osu.Server.Spectator.Hubs.Spectator
 
                     score.ScoreInfo.Date = DateTimeOffset.UtcNow;
 
-                    scoreUploader.Enqueue(scoreToken.Value, score);
+                    scoreUploader.Enqueue(scoreToken.Value, scoreId.Value, score);
                     await scoreProcessedSubscriber.RegisterForNotificationAsync(Context.ConnectionId, CurrentContextUserId, scoreToken.Value);
                 }
                 finally

@@ -133,7 +133,7 @@ namespace osu.Server.Spectator.Tests
             await hub.SendFrameData(new FrameDataBundle(
                 new FrameHeader(new ScoreInfo(), new ScoreProcessorStatistics()),
                 new[] { new LegacyReplayFrame(1234, 0, 0, ReplayButtonState.None) }));
-            await hub.EndPlaySession(state);
+            await hub.EndPlaySession(2345, state);
 
             await scoreUploader.Flush();
 
@@ -208,7 +208,7 @@ namespace osu.Server.Spectator.Tests
             });
 
             // End play, but set a playing state.
-            await hub.EndPlaySession(new SpectatorState
+            await hub.EndPlaySession(null, new SpectatorState
             {
                 BeatmapID = beatmap_id,
                 RulesetID = 0,
@@ -290,7 +290,7 @@ namespace osu.Server.Spectator.Tests
             await hub.SendFrameData(new FrameDataBundle(
                 new FrameHeader(new ScoreInfo(), new ScoreProcessorStatistics()),
                 new[] { new LegacyReplayFrame(1234, 0, 0, ReplayButtonState.None) }));
-            await hub.EndPlaySession(state);
+            await hub.EndPlaySession(null, state);
 
             await scoreUploader.Flush();
 
@@ -329,7 +329,7 @@ namespace osu.Server.Spectator.Tests
             await hub.SendFrameData(new FrameDataBundle(
                 new FrameHeader(new ScoreInfo(), new ScoreProcessorStatistics()),
                 new[] { new LegacyReplayFrame(1234, 0, 0, ReplayButtonState.None) }));
-            await hub.EndPlaySession(state);
+            await hub.EndPlaySession(null, state);
 
             await scoreUploader.Flush();
 
