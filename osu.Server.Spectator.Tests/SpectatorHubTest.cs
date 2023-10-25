@@ -103,9 +103,10 @@ namespace osu.Server.Spectator.Tests
         }
 
         [Theory]
-        [InlineData(false)]
-        [InlineData(true)]
-        public async Task ReplayDataIsSaved(bool savingEnabled)
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task ReplayDataIsSaved(bool savingEnabled, bool validTokenScorePair)
         {
             AppSettings.SaveReplays = savingEnabled;
 
@@ -120,7 +121,8 @@ namespace osu.Server.Spectator.Tests
             hub.Context = mockContext.Object;
             hub.Clients = mockClients.Object;
 
-            mockDatabase.Setup(db => db.GetScoreFromId(1234)).Returns(Task.FromResult<SoloScore?>(new SoloScore
+            mockDatabase.Setup(db => db.ValidateScoreTokenIdPair(1234, 456)).Returns(Task.FromResult(validTokenScorePair));
+            mockDatabase.Setup(db => db.GetScoreFromId(456)).Returns(Task.FromResult<SoloScore?>(new SoloScore
             {
                 ScoreInfo =
                 {
@@ -133,11 +135,11 @@ namespace osu.Server.Spectator.Tests
             await hub.SendFrameData(new FrameDataBundle(
                 new FrameHeader(new ScoreInfo(), new ScoreProcessorStatistics()),
                 new[] { new LegacyReplayFrame(1234, 0, 0, ReplayButtonState.None) }));
-            await hub.EndPlaySession(2345, state);
+            await hub.EndPlaySession(456, state);
 
             await scoreUploader.Flush();
 
-            if (savingEnabled)
+            if (savingEnabled && validTokenScorePair)
                 mockScoreStorage.Verify(s => s.WriteAsync(It.Is<Score>(score => score.ScoreInfo.OnlineID == 456)), Times.Once);
             else
                 mockScoreStorage.Verify(s => s.WriteAsync(It.IsAny<Score>()), Times.Never);
@@ -208,7 +210,7 @@ namespace osu.Server.Spectator.Tests
             });
 
             // End play, but set a playing state.
-            await hub.EndPlaySession(null, new SpectatorState
+            await hub.EndPlaySession(0, new SpectatorState
             {
                 BeatmapID = beatmap_id,
                 RulesetID = 0,
@@ -271,7 +273,8 @@ namespace osu.Server.Spectator.Tests
             hub.Context = mockContext.Object;
             hub.Clients = mockClients.Object;
 
-            mockDatabase.Setup(db => db.GetScoreFromId(1234)).Returns(Task.FromResult<SoloScore?>(new SoloScore
+            mockDatabase.Setup(db => db.ValidateScoreTokenIdPair(1234, 456)).Returns(Task.FromResult(true));
+            mockDatabase.Setup(db => db.GetScoreFromId(456)).Returns(Task.FromResult<SoloScore?>(new SoloScore
             {
                 ScoreInfo =
                 {
@@ -290,7 +293,7 @@ namespace osu.Server.Spectator.Tests
             await hub.SendFrameData(new FrameDataBundle(
                 new FrameHeader(new ScoreInfo(), new ScoreProcessorStatistics()),
                 new[] { new LegacyReplayFrame(1234, 0, 0, ReplayButtonState.None) }));
-            await hub.EndPlaySession(null, state);
+            await hub.EndPlaySession(456, state);
 
             await scoreUploader.Flush();
 

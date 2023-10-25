@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Moq;
 using osu.Game.Scoring;
@@ -27,7 +26,7 @@ namespace osu.Server.Spectator.Tests
             {
                 ScoreInfo =
                 {
-                    ID = 2,
+                    ID = 1,
                     Passed = true
                 }
             }));
@@ -48,12 +47,12 @@ namespace osu.Server.Spectator.Tests
             // First score.
             uploader.Enqueue(1, new Score());
             await Task.Delay(2000);
-            mockStorage.Verify(s => s.WriteAsync(It.Is<Score>(score => score.ScoreInfo.OnlineID == 2)), Times.Once);
+            mockStorage.Verify(s => s.WriteAsync(It.Is<Score>(score => score.ScoreInfo.OnlineID == 1)), Times.Once);
 
             // Second score (ensure the loop keeps running).
             uploader.Enqueue(1, new Score());
             await Task.Delay(2000);
-            mockStorage.Verify(s => s.WriteAsync(It.Is<Score>(score => score.ScoreInfo.OnlineID == 2)), Times.Exactly(2));
+            mockStorage.Verify(s => s.WriteAsync(It.Is<Score>(score => score.ScoreInfo.OnlineID == 1)), Times.Exactly(2));
         }
 
         [Fact]
@@ -78,7 +77,7 @@ namespace osu.Server.Spectator.Tests
         }
 
         [Fact]
-        public async Task ScoreUploadsWithDelayedScoreToken()
+        public async Task ScoreFailsToUploadWithNonVerifiedId()
         {
             enableUpload();
 
@@ -86,53 +85,6 @@ namespace osu.Server.Spectator.Tests
             uploader.Enqueue(2, new Score());
             await uploader.Flush();
             mockStorage.Verify(s => s.WriteAsync(It.IsAny<Score>()), Times.Never);
-
-            // Give the score a token.
-            mockDatabase.Setup(db => db.GetScoreFromId(2)).Returns(Task.FromResult<SoloScore?>(new SoloScore
-            {
-                ScoreInfo =
-                {
-                    ID = 3,
-                    Passed = true
-                }
-            }));
-
-            await uploader.Flush();
-
-            mockStorage.Verify(s => s.WriteAsync(It.Is<Score>(score => score.ScoreInfo.OnlineID == 3)), Times.Once);
-        }
-
-        [Fact]
-        public async Task TimedOutScoreDoesNotUpload()
-        {
-            enableUpload();
-
-            uploader.TimeoutInterval = 0;
-
-            // Score with no token.
-            uploader.Enqueue(2, new Score());
-            Thread.Sleep(1000); // Wait for cancellation.
-            await uploader.Flush();
-            mockStorage.Verify(s => s.WriteAsync(It.IsAny<Score>()), Times.Never);
-
-            // Give the score a token now. It should still not upload because it has timed out.
-            mockDatabase.Setup(db => db.GetScoreFromId(2)).Returns(Task.FromResult<SoloScore?>(new SoloScore
-            {
-                ScoreInfo =
-                {
-                    ID = 3,
-                    Passed = true
-                }
-            }));
-
-            await uploader.Flush();
-            mockStorage.Verify(s => s.WriteAsync(It.IsAny<Score>()), Times.Never);
-
-            // New score that has a token (ensure the loop keeps running).
-            uploader.Enqueue(1, new Score());
-            await uploader.Flush();
-            mockStorage.Verify(s => s.WriteAsync(It.IsAny<Score>()), Times.Once);
-            mockStorage.Verify(s => s.WriteAsync(It.Is<Score>(score => score.ScoreInfo.OnlineID == 2)), Times.Once);
         }
 
         [Fact]
@@ -167,20 +119,6 @@ namespace osu.Server.Spectator.Tests
             uploader.Enqueue(1, new Score());
             await uploader.Flush();
             Assert.Equal(1, uploadCount);
-        }
-
-        [Fact]
-        public async Task TimedOutItemGetsOneAttempt()
-        {
-            enableUpload();
-
-            uploader.TimeoutInterval = 0;
-
-            // Score with no token.
-            uploader.Enqueue(1, new Score());
-            Thread.Sleep(1000); // Wait for cancellation.
-            await uploader.Flush();
-            mockStorage.Verify(s => s.WriteAsync(It.Is<Score>(score => score.ScoreInfo.OnlineID == 2)), Times.Once);
         }
 
         private void enableUpload() => AppSettings.SaveReplays = true;
