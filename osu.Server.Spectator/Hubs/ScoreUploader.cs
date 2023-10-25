@@ -20,12 +20,6 @@ namespace osu.Server.Spectator.Hubs
         /// </summary>
         public int UploadInterval { get; set; } = 50;
 
-        /// <summary>
-        /// Amount of time (in milliseconds) before any individual score times out if a score ID hasn't been set.
-        /// This can happen if the user forcefully terminated the game before the API score submission request is sent, but after EndPlaySession() has been invoked.
-        /// </summary>
-        public double TimeoutInterval = 30000;
-
         private readonly ConcurrentQueue<UploadItem> queue = new ConcurrentQueue<UploadItem>();
         private readonly IDatabaseFactory databaseFactory;
         private readonly IScoreStorage scoreStorage;
@@ -66,10 +60,7 @@ namespace osu.Server.Spectator.Hubs
 
             Interlocked.Increment(ref remainingUsages);
 
-            var cancellation = new CancellationTokenSource();
-            cancellation.CancelAfter(TimeSpan.FromMilliseconds(TimeoutInterval));
-
-            queue.Enqueue(new UploadItem(scoreId, score, cancellation));
+            queue.Enqueue(new UploadItem(scoreId, score));
         }
 
         /// <summary>
@@ -93,7 +84,7 @@ namespace osu.Server.Spectator.Hubs
 
                         SoloScore? dbScore = await db.GetScoreFromId(item.ScoreId);
 
-                        if (dbScore == null && !item.Cancellation.IsCancellationRequested)
+                        if (dbScore == null)
                         {
                             Console.WriteLine($"Score not found for ID: {item.ScoreId}");
                             return;
@@ -101,12 +92,6 @@ namespace osu.Server.Spectator.Hubs
 
                         try
                         {
-                            if (dbScore == null)
-                            {
-                                Console.WriteLine($"Score upload timed out for token: {item.ScoreId}");
-                                return;
-                            }
-
                             if (!dbScore.ScoreInfo.Passed)
                                 return;
 
@@ -124,7 +109,6 @@ namespace osu.Server.Spectator.Hubs
                         }
                         finally
                         {
-                            item.Dispose();
                             Interlocked.Decrement(ref remainingUsages);
                         }
                     }
@@ -142,22 +126,15 @@ namespace osu.Server.Spectator.Hubs
             cancellationSource.Dispose();
         }
 
-        private class UploadItem : IDisposable
+        private class UploadItem
         {
             public long ScoreId { get; }
             public Score Score { get; }
-            public CancellationTokenSource Cancellation { get; }
 
-            public UploadItem(long scoreId, Score score, CancellationTokenSource cancellation)
+            public UploadItem(long scoreId, Score score)
             {
                 ScoreId = scoreId;
                 Score = score;
-                Cancellation = cancellation;
-            }
-
-            public void Dispose()
-            {
-                Cancellation.Dispose();
             }
         }
 
