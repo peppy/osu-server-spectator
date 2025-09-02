@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using osu.Game.Online;
 using osu.Game.Online.API;
+using osu.Game.Online.Matchmaking;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Online.Multiplayer.Countdown;
 using osu.Game.Online.Rooms;
@@ -17,6 +18,8 @@ using osu.Server.Spectator.Database;
 using osu.Server.Spectator.Database.Models;
 using osu.Server.Spectator.Entities;
 using osu.Server.Spectator.Extensions;
+using osu.Server.Spectator.Hubs.Multiplayer.Matchmaking;
+using osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue;
 using osu.Server.Spectator.Services;
 
 namespace osu.Server.Spectator.Hubs.Multiplayer
@@ -31,6 +34,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer
         private readonly ChatFilters chatFilters;
         private readonly ISharedInterop sharedInterop;
         private readonly MultiplayerEventLogger multiplayerEventLogger;
+        private readonly IMatchmakingQueueBackgroundService matchmakingQueueService;
 
         public MultiplayerHub(
             ILoggerFactory loggerFactory,
@@ -40,13 +44,15 @@ namespace osu.Server.Spectator.Hubs.Multiplayer
             ChatFilters chatFilters,
             IHubContext<MultiplayerHub> hubContext,
             ISharedInterop sharedInterop,
-            MultiplayerEventLogger multiplayerEventLogger)
+            MultiplayerEventLogger multiplayerEventLogger,
+            IMatchmakingQueueBackgroundService matchmakingQueueService)
             : base(loggerFactory, users)
         {
             this.databaseFactory = databaseFactory;
             this.chatFilters = chatFilters;
             this.sharedInterop = sharedInterop;
             this.multiplayerEventLogger = multiplayerEventLogger;
+            this.matchmakingQueueService = matchmakingQueueService;
 
             Rooms = rooms;
             HubContext = new MultiplayerHubContext(hubContext, rooms, users, loggerFactory, databaseFactory, sharedInterop, multiplayerEventLogger);
@@ -222,6 +228,9 @@ namespace osu.Server.Spectator.Hubs.Multiplayer
 
                 if (databaseRoom.ends_at != null && databaseRoom.ends_at < DateTimeOffset.Now)
                     throw new InvalidStateException("Match has already ended.");
+
+                if (databaseRoom.type != database_match_type.matchmaking && databaseRoom.user_id != Context.GetUserId())
+                    throw new InvalidOperationException("Non-host is attempting to join match before host");
 
                 var room = new ServerMultiplayerRoom(roomId, HubContext, databaseFactory)
                 {
@@ -763,6 +772,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer
         protected override async Task CleanUpState(MultiplayerClientState state)
         {
             await base.CleanUpState(state);
+            await matchmakingQueueService.RemoveFromQueueAsync(new MatchmakingClientState(state));
             await leaveRoom(state, true);
         }
 
@@ -884,5 +894,80 @@ namespace osu.Server.Spectator.Hubs.Multiplayer
         internal Task<ItemUsage<ServerMultiplayerRoom>> GetRoom(long roomId) => Rooms.GetForUse(roomId);
 
         protected void Log(ServerMultiplayerRoom room, string message, LogLevel logLevel = LogLevel.Information) => base.Log($"[room:{room.RoomID}] {message}", logLevel);
+
+        public async Task JoinMatchmakingLobby()
+        {
+            using (await GetOrCreateLocalUserState())
+                await matchmakingQueueService.AddToLobbyAsync(new MatchmakingClientState(Context));
+        }
+
+        public async Task LeaveMatchmakingLobby()
+        {
+            using (await GetOrCreateLocalUserState())
+                await matchmakingQueueService.RemoveFromLobbyAsync(new MatchmakingClientState(Context));
+        }
+
+        public async Task JoinMatchmakingQueue(MatchmakingSettings settings)
+        {
+            using (await GetOrCreateLocalUserState())
+            {
+                await matchmakingQueueService.AddToQueueAsync(new MatchmakingClientState(Context)
+                {
+                    Settings = settings
+                });
+            }
+        }
+
+        public async Task LeaveMatchmakingQueue()
+        {
+            using (await GetOrCreateLocalUserState())
+                await matchmakingQueueService.RemoveFromQueueAsync(new MatchmakingClientState(Context));
+        }
+
+        public async Task MatchmakingAcceptInvitation()
+        {
+            using (await GetOrCreateLocalUserState())
+                await matchmakingQueueService.AcceptInvitationAsync(new MatchmakingClientState(Context));
+        }
+
+        public async Task MatchmakingDeclineInvitation()
+        {
+            using (await GetOrCreateLocalUserState())
+                await matchmakingQueueService.DeclineInvitationAsync(new MatchmakingClientState(Context));
+        }
+
+        public async Task MatchmakingToggleSelection(long playlistItemId)
+        {
+            using (var userUsage = await GetOrCreateLocalUserState())
+            using (var roomUsage = await getLocalUserRoom(userUsage.Item))
+            {
+                var room = roomUsage.Item;
+                if (room == null)
+                    throw new InvalidOperationException("Attempted to operate on a null room");
+
+                var user = room.Users.FirstOrDefault(u => u.UserID == Context.GetUserId());
+                if (user == null)
+                    throw new InvalidOperationException("Local user was not found in the expected room");
+
+                await ((MatchmakingMatchController)room.Controller).ToggleSelectionAsync(user, playlistItemId);
+            }
+        }
+
+        public async Task MatchmakingSkipToNextStage()
+        {
+            using (var userUsage = await GetOrCreateLocalUserState())
+            using (var roomUsage = await getLocalUserRoom(userUsage.Item))
+            {
+                var room = roomUsage.Item;
+                if (room == null)
+                    throw new InvalidOperationException("Attempted to operate on a null room");
+
+                var user = room.Users.FirstOrDefault(u => u.UserID == Context.GetUserId());
+                if (user == null)
+                    throw new InvalidOperationException("Local user was not found in the expected room");
+
+                await ((MatchmakingMatchController)room.Controller).SkipToNextRound();
+            }
+        }
     }
 }
