@@ -5,7 +5,10 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using osu.Game.Online.Matchmaking;
+using osu.Game.Online.Matchmaking.Requests;
+using osu.Game.Online.Matchmaking.Responses;
 using osu.Game.Online.Multiplayer;
+using osu.Server.Spectator.Database.Models;
 using osu.Server.Spectator.Extensions;
 
 namespace osu.Server.Spectator.Hubs.Multiplayer
@@ -15,6 +18,21 @@ namespace osu.Server.Spectator.Hubs.Multiplayer
         // Provided for backwards compatibility. Can be removed 20260727.
         public Task<MatchmakingPool[]> GetMatchmakingPools()
             => GetMatchmakingPoolsOfType(MatchmakingPoolType.QuickPlay);
+
+        // Provided for backwards compatibility. Can be removed 20261001.
+        public async Task MatchmakingJoinLobby()
+        {
+            using (var db = databaseFactory.GetInstance())
+            {
+                // Since this is only a compatibility method, we don't really care WHICH lobby is joined, as long as it's one of the active pools.
+                matchmaking_pool? pool = (await db.GetActiveMatchmakingPoolsAsync()).FirstOrDefault();
+
+                if (pool == null)
+                    return;
+
+                await MatchmakingJoinLobbyWithParams(new MatchmakingJoinLobbyRequest { PoolId = (int)pool.id });
+            }
+        }
 
         public async Task<MatchmakingPool[]> GetMatchmakingPoolsOfType(MatchmakingPoolType type)
         {
@@ -27,10 +45,12 @@ namespace osu.Server.Spectator.Hubs.Multiplayer
             }
         }
 
-        public async Task MatchmakingJoinLobby()
+        public async Task<MatchmakingJoinLobbyResponse> MatchmakingJoinLobbyWithParams(MatchmakingJoinLobbyRequest request)
         {
             using (var userUsage = await GetOrCreateLocalUserState())
                 await matchmakingQueueService.AddToLobbyAsync(userUsage.Item!);
+
+            return new MatchmakingJoinLobbyResponse();
         }
 
         public async Task MatchmakingLeaveLobby()
