@@ -3,7 +3,7 @@
 
 using System;
 using System.Collections.Concurrent;
-using System.Linq;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
@@ -33,10 +33,10 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
         /// </summary>
         private static readonly TimeSpan lobby_update_rate = AppSettings.MatchmakingLobbyUpdateRate;
 
-        private const string lobby_users_group = "matchmaking-lobby-users";
         private const string statsd_prefix = "matchmaking";
         private static string queue_ban_start_time(int userId) => $"matchmaking-ban-start-time:{userId}";
 
+        private readonly ConcurrentDictionary<int, MatchmakingLobby> poolLobbies = new ConcurrentDictionary<int, MatchmakingLobby>();
         private readonly ConcurrentDictionary<int, MatchmakingQueue> poolQueues = new ConcurrentDictionary<int, MatchmakingQueue>();
         private readonly ConcurrentDictionary<uint, MatchmakingBeatmapSelector> poolSelectors = new ConcurrentDictionary<uint, MatchmakingBeatmapSelector>();
 
@@ -81,15 +81,30 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
             return false;
         }
 
-        public async Task AddToLobbyAsync(MultiplayerClientState state)
+        public async Task AddToLobbyAsync(MultiplayerClientState state, int poolId)
         {
-            await hub.Groups.AddToGroupAsync(state.ConnectionId, lobby_users_group);
-            await sendLobbyUpdate(hub.Clients.Client(state.ConnectionId));
+            await RemoveFromLobbyAsync(state);
+
+            using (var db = databaseFactory.GetInstance())
+            {
+                matchmaking_pool pool = await db.GetMatchmakingPoolAsync((uint)poolId) ?? throw new InvalidStateException($"Pool not found: {poolId}");
+
+                if (!pool.active)
+                    throw new InvalidStateException("The selected matchmaking pool is no longer active.");
+
+                MatchmakingLobby lobby = poolLobbies.GetOrAdd(poolId, _ => new MatchmakingLobby(poolId, hub, databaseFactory)
+                {
+                    LookupQueue = id => poolQueues.GetValueOrDefault(id)
+                });
+
+                await lobby.Add(state);
+            }
         }
 
         public async Task RemoveFromLobbyAsync(MultiplayerClientState state)
         {
-            await hub.Groups.RemoveFromGroupAsync(state.ConnectionId, lobby_users_group);
+            foreach ((_, MatchmakingLobby lobby) in poolLobbies)
+                await lobby.Remove(state);
         }
 
         public async Task AddToQueueAsync(MultiplayerClientState state, int poolId)
@@ -211,23 +226,10 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
             if (DateTimeOffset.Now - lastLobbyUpdateTime < lobby_update_rate)
                 return;
 
-            await sendLobbyUpdate(hub.Clients.Group(lobby_users_group));
+            foreach ((_, MatchmakingLobby lobby) in poolLobbies)
+                await lobby.Update();
 
             lastLobbyUpdateTime = DateTimeOffset.Now;
-        }
-
-        private async Task sendLobbyUpdate(IClientProxy clients)
-        {
-            MatchmakingQueueUser[] users = poolQueues.Values.SelectMany(queue => queue.GetAllUsers()).ToArray();
-            Random.Shared.Shuffle(users);
-            int[] usersSample = users.Take(50).Select(u => u.UserId).ToArray();
-
-            var status = new MatchmakingLobbyStatus
-            {
-                UsersInQueue = usersSample
-            };
-
-            await clients.SendAsync(nameof(IMatchmakingClient.MatchmakingLobbyStatusChanged), status);
         }
 
         private async Task refreshQueues()

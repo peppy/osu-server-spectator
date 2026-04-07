@@ -48,7 +48,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer
         public async Task<MatchmakingJoinLobbyResponse> MatchmakingJoinLobbyWithParams(MatchmakingJoinLobbyRequest request)
         {
             using (var userUsage = await GetOrCreateLocalUserState())
-                await matchmakingQueueService.AddToLobbyAsync(userUsage.Item!);
+                await matchmakingQueueService.AddToLobbyAsync(userUsage.Item!, request.PoolId);
 
             return new MatchmakingJoinLobbyResponse();
         }
