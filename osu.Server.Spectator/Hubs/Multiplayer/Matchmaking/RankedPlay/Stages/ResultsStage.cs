@@ -56,6 +56,10 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay.Stages
                     NewLife = newLife,
                 };
             }
+
+            SoloScore[] winningScores = scores.Where(u => u.total_score == maxTotalScore).ToArray();
+            if (winningScores.Length == 1)
+                State.Users[(int)winningScores.Single().user_id].RoundsWon += 1;
         }
 
         protected override async Task Finish()

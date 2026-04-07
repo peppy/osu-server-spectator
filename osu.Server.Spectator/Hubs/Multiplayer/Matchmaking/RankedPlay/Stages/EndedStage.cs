@@ -35,9 +35,9 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay.Stages
                 return;
 
             int maxLife = State.Users.Max(u => u.Value.Life);
-            var winners = State.Users.Where(u => u.Value.Life == maxLife).ToArray();
-            if (winners.Length == 1)
-                State.WinningUserId = winners[0].Key;
+            int[] winningUsers = State.Users.Where(u => u.Value.Life == maxLife).Select(u => u.Key).ToArray();
+            if (winningUsers.Length == 1)
+                State.WinningUserId = winningUsers.Single();
 
             using (var db = DbFactory.GetInstance())
             {
