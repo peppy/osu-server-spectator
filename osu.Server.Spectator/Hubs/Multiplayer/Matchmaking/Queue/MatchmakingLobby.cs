@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
@@ -22,6 +23,26 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
         private readonly IHubContext<MultiplayerHub> hub;
         private readonly IDatabaseFactory dbFactory;
         private readonly string groupName;
+
+        /// <summary>
+        /// Any newly recorded match reports since the last distribution.
+        /// </summary>
+        private readonly List<MatchRoomState> newMatchStatusReports = [];
+
+        /// <summary>
+        /// The most recent 50 distributed match reports.
+        /// </summary>
+        private readonly List<MatchRoomState> lastDistributedMatchStatusReports = [];
+
+        /// <summary>
+        /// The time at which the rating distribution array was last updated.
+        /// </summary>
+        private DateTimeOffset lastRatingDistributionRefreshTime = DateTimeOffset.UnixEpoch;
+
+        /// <summary>
+        /// This pool's rating distribution.
+        /// </summary>
+        private (int Rating, int Count)[] ratingDistribution = [];
 
         public MatchmakingLobby(int poolId, IHubContext<MultiplayerHub> hub, IDatabaseFactory dbFactory)
         {
@@ -50,6 +71,8 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
 
         public Task RecordMatch(MatchRoomState state)
         {
+            lock (newMatchStatusReports)
+                newMatchStatusReports.Add(state);
             return Task.CompletedTask;
         }
 
@@ -60,6 +83,49 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
         /// <returns>The status update bundle.</returns>
         private async Task<MatchmakingLobbyStatus> buildStatusUpdate(int? targetUserId)
         {
+            MatchRoomState[] statusReports;
+
+            if (targetUserId == null)
+            {
+                lock (newMatchStatusReports)
+                {
+                    statusReports = newMatchStatusReports.ToArray();
+
+                    lastDistributedMatchStatusReports.AddRange(statusReports);
+                    newMatchStatusReports.Clear();
+
+                    while (lastDistributedMatchStatusReports.Count > 50)
+                        lastDistributedMatchStatusReports.RemoveAt(0);
+                }
+            }
+            else
+                statusReports = lastDistributedMatchStatusReports.ToArray();
+
+            int? userRating = null;
+
+            using (var db = dbFactory.GetInstance())
+            {
+                if (DateTimeOffset.Now - lastRatingDistributionRefreshTime >= TimeSpan.FromMinutes(5))
+                {
+                    Dictionary<int, int> ratingCounts = new Dictionary<int, int>();
+
+                    foreach (int rating in await db.GetMatchmakingPoolRatingsAsync((uint)poolId))
+                    {
+                        int ratingRounded = (int)Math.Round((float)rating / 25) * 25;
+                        ratingCounts[ratingRounded] = ratingCounts.GetValueOrDefault(ratingRounded) + 1;
+                    }
+
+                    ratingDistribution = ratingCounts.OrderBy(kvp => kvp.Key).Select(kvp => (kvp.Key, kvp.Value)).ToArray();
+                    lastRatingDistributionRefreshTime = DateTimeOffset.Now;
+                }
+
+                if (targetUserId != null)
+                {
+                    var userStats = await db.GetMatchmakingUserStatsAsync(targetUserId.Value, (uint)poolId);
+                    userRating = userStats == null ? null : (int)Math.Round(userStats.EloData.Rating.Mu);
+                }
+            }
+
             MatchmakingQueue? queue = LookupQueue(poolId);
             MatchmakingQueueUser[] queuedUsers = queue?.GetAllUsers() ?? [];
             Random.Shared.Shuffle(queuedUsers);
@@ -67,6 +133,9 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
             return new MatchmakingLobbyStatus
             {
                 UsersInQueue = queuedUsers.Take(50).Select(u => u.UserId).ToArray(),
+                RatingDistribution = ratingDistribution,
+                UserRating = userRating,
+                RecentMatches = statusReports
             };
         }
     }

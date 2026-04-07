@@ -124,7 +124,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking
             await startCountdown(TimeSpan.FromSeconds(stage_waiting_for_clients_join_time), stageRoundWarmupTime);
         }
 
-        public async Task Initialise(uint poolId, MatchmakingQueueUser[] users, MatchmakingBeatmapSelector beatmapSelector)
+        public async Task Initialise(uint poolId, MatchmakingQueueUser[] users, MatchmakingBeatmapSelector beatmapSelector, IMatchmakingQueueBackgroundService matchmakingService)
         {
             this.poolId = poolId;
 

@@ -3,11 +3,17 @@
 
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
+using osu.Game.Online.Multiplayer;
 
 namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
 {
     public interface IMatchmakingQueueBackgroundService : IHostedService
     {
+        /// <summary>
+        /// Records the current state of a match.
+        /// </summary>
+        Task RecordMatch(int poolId, MatchRoomState state);
+
         /// <summary>
         /// Whether a user is in the matchmaking queue.
         /// </summary>

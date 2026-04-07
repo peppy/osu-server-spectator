@@ -32,7 +32,10 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay.Stages
             // Forego any rating calculations if the match hasn't started yet.
             // Naturally, this also means we don't have a winner to crown.
             if (State.CurrentRound == 0)
+            {
+                await Controller.MatchmakingService.RecordMatch((int)Controller.PoolId, State);
                 return;
+            }
 
             int maxLife = State.Users.Max(u => u.Value.Life);
             int[] winningUsers = State.Users.Where(u => u.Value.Life == maxLife).Select(u => u.Key).ToArray();
@@ -95,6 +98,8 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay.Stages
                     State.Users[(int)stats[i].user_id].RatingAfter = (int)Math.Round(newRatings[i].Mu);
                 }
             }
+
+            await Controller.MatchmakingService.RecordMatch((int)Controller.PoolId, State);
         }
 
         protected override Task Finish()

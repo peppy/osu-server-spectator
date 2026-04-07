@@ -930,7 +930,7 @@ namespace osu.Server.Spectator.Tests.Matchmaking
                                                                                   MultiplayerEventDispatcher eventDispatcher, ILoggerFactory loggerFactory,
                                                                                   uint poolId, int[] users, MatchmakingBeatmapSelector beatmapSelector)
             => ServerMultiplayerRoom.InitialiseMatchmakingRoomAsync(roomId, roomController, dbFactory, eventDispatcher, loggerFactory, poolId,
-                users.Select(u => new MatchmakingQueueUser(u.ToString()) { UserId = u }).ToArray(), beatmapSelector);
+                users.Select(u => new MatchmakingQueueUser(u.ToString()) { UserId = u }).ToArray(), beatmapSelector, new Mock<IMatchmakingQueueBackgroundService>().Object);
 
         public Task DisposeAsync()
         {

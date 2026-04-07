@@ -70,6 +70,15 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
             logger = loggerFactory.CreateLogger(nameof(MatchmakingQueueBackgroundService));
         }
 
+        public Task RecordMatch(int poolId, MatchRoomState status)
+        {
+            if (!poolLobbies.TryGetValue(poolId, out MatchmakingLobby? lobby))
+                return Task.CompletedTask;
+
+            lobby.RecordMatch(status);
+            return Task.CompletedTask;
+        }
+
         public bool IsInQueue(MultiplayerClientState state)
         {
             foreach ((_, MatchmakingQueue queue) in poolQueues)
@@ -338,7 +347,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
                 using (var roomUsage = await rooms.GetForUse(roomId, true))
                 {
                     roomUsage.Item = await ServerMultiplayerRoom.InitialiseMatchmakingRoomAsync(roomId, roomController, databaseFactory, eventDispatcher, loggerFactory, bundle.Queue.Pool.id,
-                        group.Users, beatmapSelector);
+                        group.Users, beatmapSelector, this);
                 }
 
                 await hub.Clients.Group(group.Identifier).SendAsync(nameof(IMatchmakingClient.MatchmakingRoomReady), roomId, password);
