@@ -93,8 +93,22 @@ namespace osu.Server.Spectator.Tests.RankedPlay.Stages
                         Delay = 0,
                         Cards = new Dictionary<Guid, RankedPlayCardState>
                         {
-                            [secondCard.ID] = new RankedPlayCardState { Selected = false, Hovered = false, Pressed = false, },
-                            [thirdCard.ID] = new RankedPlayCardState { Selected = true, Hovered = false, Pressed = false, },
+                            [secondCard.ID] = new RankedPlayCardState
+                            {
+                                Selected = false,
+                                Hovered = false,
+                                Pressed = false,
+                                Dragged = false,
+                                Order = 0,
+                            },
+                            [thirdCard.ID] = new RankedPlayCardState
+                            {
+                                Selected = true,
+                                Hovered = false,
+                                Pressed = false,
+                                Dragged = false,
+                                Order = 0,
+                            },
                         }
                     },
                     new RankedPlayCardHandReplayFrame
@@ -102,8 +116,22 @@ namespace osu.Server.Spectator.Tests.RankedPlay.Stages
                         Delay = 0,
                         Cards = new Dictionary<Guid, RankedPlayCardState>
                         {
-                            [secondCard.ID] = new RankedPlayCardState { Selected = true, Hovered = false, Pressed = false, },
-                            [thirdCard.ID] = new RankedPlayCardState { Selected = false, Hovered = false, Pressed = false, },
+                            [secondCard.ID] = new RankedPlayCardState
+                            {
+                                Selected = true,
+                                Hovered = false,
+                                Pressed = false,
+                                Dragged = false,
+                                Order = 0,
+                            },
+                            [thirdCard.ID] = new RankedPlayCardState
+                            {
+                                Selected = false,
+                                Hovered = false,
+                                Pressed = false,
+                                Dragged = false,
+                                Order = 0,
+                            },
                         }
                     }
                 }
@@ -139,6 +167,8 @@ namespace osu.Server.Spectator.Tests.RankedPlay.Stages
                                 Selected = true,
                                 Hovered = false,
                                 Pressed = false,
+                                Dragged = false,
+                                Order = 0,
                             }
                         }
                     }
@@ -172,6 +202,8 @@ namespace osu.Server.Spectator.Tests.RankedPlay.Stages
                                 Selected = true,
                                 Hovered = false,
                                 Pressed = false,
+                                Dragged = false,
+                                Order = 0,
                             }
                         }
                     }
@@ -208,6 +240,8 @@ namespace osu.Server.Spectator.Tests.RankedPlay.Stages
                                 Selected = true,
                                 Hovered = false,
                                 Pressed = false,
+                                Dragged = false,
+                                Order = 0,
                             }
                         }
                     }
