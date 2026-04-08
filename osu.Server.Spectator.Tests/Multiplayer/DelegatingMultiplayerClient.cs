@@ -177,8 +177,10 @@ namespace osu.Server.Spectator.Tests.Multiplayer
 
         public virtual async Task MatchmakingRoomInvited()
         {
+#pragma warning disable CS0612 // Type or member is obsolete
             foreach (var c in Clients.OfType<IMatchmakingClient>())
                 await c.MatchmakingRoomInvited();
+#pragma warning restore CS0612 // Type or member is obsolete
         }
 
         public virtual async Task MatchmakingRoomInvitedWithParams(MatchmakingRoomInvitationParams invitation)
