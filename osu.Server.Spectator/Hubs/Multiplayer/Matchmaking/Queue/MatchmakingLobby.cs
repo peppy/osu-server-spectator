@@ -25,14 +25,14 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
         private readonly string groupName;
 
         /// <summary>
-        /// Any newly recorded match reports since the last distribution.
+        /// Any newly completed matches since the last global distribution.
         /// </summary>
-        private readonly List<MatchRoomState> newMatchStatusReports = [];
+        private readonly List<MatchRoomState> newlyCompletedMatches = [];
 
         /// <summary>
-        /// The most recent 50 distributed match reports.
+        /// The 50 most recently completed matches.
         /// </summary>
-        private readonly List<MatchRoomState> lastDistributedMatchStatusReports = [];
+        private readonly List<MatchRoomState> recentlyCompletedMatches = [];
 
         /// <summary>
         /// The time at which the rating distribution array was last updated.
@@ -71,8 +71,8 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
 
         public Task RecordMatch(MatchRoomState state)
         {
-            lock (newMatchStatusReports)
-                newMatchStatusReports.Add(state);
+            lock (newlyCompletedMatches)
+                newlyCompletedMatches.Add(state);
             return Task.CompletedTask;
         }
 
@@ -83,23 +83,26 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
         /// <returns>The status update bundle.</returns>
         private async Task<MatchmakingLobbyStatus> buildStatusUpdate(int? targetUserId)
         {
-            MatchRoomState[] statusReports;
+            MatchRoomState[] matches;
 
-            if (targetUserId == null)
+            lock (newlyCompletedMatches)
             {
-                lock (newMatchStatusReports)
+                // When arriving with no target user, this is an update to be sent globally to all users.
+                // We only want to send new matches which have not been reported to the user previously.
+                if (targetUserId == null)
                 {
-                    statusReports = newMatchStatusReports.ToArray();
+                    matches = newlyCompletedMatches.ToArray();
+                    newlyCompletedMatches.Clear();
 
-                    lastDistributedMatchStatusReports.AddRange(statusReports);
-                    newMatchStatusReports.Clear();
-
-                    while (lastDistributedMatchStatusReports.Count > 50)
-                        lastDistributedMatchStatusReports.RemoveAt(0);
+                    // Update the recent list with any new matches, ensuring we keep only 50 max.
+                    recentlyCompletedMatches.AddRange(matches);
+                    while (recentlyCompletedMatches.Count > 50)
+                        recentlyCompletedMatches.RemoveAt(0);
                 }
+
+                else
+                    matches = recentlyCompletedMatches.ToArray();
             }
-            else
-                statusReports = lastDistributedMatchStatusReports.ToArray();
 
             int? userRating = null;
 
@@ -135,7 +138,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
                 UsersInQueue = queuedUsers.Take(50).Select(u => u.UserId).ToArray(),
                 RatingDistribution = ratingDistribution,
                 UserRating = userRating,
-                RecentMatches = statusReports
+                RecentMatches = matches
             };
         }
     }
