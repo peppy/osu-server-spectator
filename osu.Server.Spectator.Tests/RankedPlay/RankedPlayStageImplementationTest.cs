@@ -65,7 +65,7 @@ namespace osu.Server.Spectator.Tests.RankedPlay
                     {
                         id = (uint)i,
                         beatmap_id = i
-                    }).ToArray()));
+                    }).ToArray()), new Mock<IMatchmakingQueueBackgroundService>().Object);
 
                 Room = room.Item;
             }

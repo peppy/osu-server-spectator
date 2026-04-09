@@ -3,11 +3,17 @@
 
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
+using osu.Game.Online.Multiplayer;
 
 namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
 {
     public interface IMatchmakingQueueBackgroundService : IHostedService
     {
+        /// <summary>
+        /// Records the current state of a match.
+        /// </summary>
+        Task RecordMatch(int poolId, MatchRoomState state);
+
         /// <summary>
         /// Whether a user is in the matchmaking queue.
         /// </summary>
@@ -16,13 +22,11 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
         /// <summary>
         /// Adds a user to the matchmaking lobby.
         /// </summary>
-        Task AddToLobbyAsync(MultiplayerClientState state);
+        Task AddToLobbyAsync(MultiplayerClientState state, int poolId);
 
         /// <summary>
         /// Remove sa user from the matchmaking lobby.
         /// </summary>
-        /// <param name="state"></param>
-        /// <returns></returns>
         Task RemoveFromLobbyAsync(MultiplayerClientState state);
 
         /// <summary>

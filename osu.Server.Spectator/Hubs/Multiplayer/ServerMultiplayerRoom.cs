@@ -122,17 +122,19 @@ namespace osu.Server.Spectator.Hubs.Multiplayer
         /// <param name="poolId">The pool ID.</param>
         /// <param name="users">The users who are allowed to join the room.</param>
         /// <param name="beatmapSelector">The beatmap selector.</param>
+        /// <param name="matchmakingService">The matchmaking service.</param>
         /// <exception cref="InvalidOperationException">If the room is not a matchmaking room in the database.</exception>
         public static async Task<ServerMultiplayerRoom> InitialiseMatchmakingRoomAsync(long roomId, IMultiplayerRoomController roomController, IDatabaseFactory dbFactory,
                                                                                        MultiplayerEventDispatcher eventDispatcher, ILoggerFactory loggerFactory,
-                                                                                       uint poolId, MatchmakingQueueUser[] users, MatchmakingBeatmapSelector beatmapSelector)
+                                                                                       uint poolId, MatchmakingQueueUser[] users, MatchmakingBeatmapSelector beatmapSelector,
+                                                                                       IMatchmakingQueueBackgroundService matchmakingService)
         {
             ServerMultiplayerRoom room = await InitialiseAsync(roomId, roomController, dbFactory, eventDispatcher, loggerFactory);
 
             if (room.MatchController is not IMatchmakingMatchController matchmakingController)
                 throw new InvalidOperationException("Failed to initialise the matchmaking room (invalid controller).");
 
-            await matchmakingController.Initialise(poolId, users, beatmapSelector);
+            await matchmakingController.Initialise(poolId, users, beatmapSelector, matchmakingService);
 
             return room;
         }

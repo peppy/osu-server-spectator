@@ -26,6 +26,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay
         public MultiplayerPlaylistItem CurrentItem => Room.Playlist.Single(item => item.ID == Room.Settings.PlaylistItemId);
 
         public uint PoolId { get; private set; }
+        public IMatchmakingQueueBackgroundService MatchmakingService { get; private set; } = null!;
 
         public readonly ServerMultiplayerRoom Room;
         public readonly IDatabaseFactory DbFactory;
@@ -80,8 +81,9 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay
             await GotoStage(RankedPlayStage.WaitForJoin);
         }
 
-        async Task IMatchmakingMatchController.Initialise(uint poolId, MatchmakingQueueUser[] users, MatchmakingBeatmapSelector beatmapSelector)
+        async Task IMatchmakingMatchController.Initialise(uint poolId, MatchmakingQueueUser[] users, MatchmakingBeatmapSelector beatmapSelector, IMatchmakingQueueBackgroundService matchmakingService)
         {
+            MatchmakingService = matchmakingService;
             PoolId = poolId;
 
             // Build the deck.

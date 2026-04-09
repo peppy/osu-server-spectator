@@ -11,6 +11,8 @@ using osu.Framework.Extensions.TypeExtensions;
 using osu.Game.Online;
 using osu.Game.Online.API;
 using osu.Game.Online.Matchmaking;
+using osu.Game.Online.Matchmaking.Requests;
+using osu.Game.Online.Matchmaking.Responses;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Online.Multiplayer.MatchTypes.RankedPlay;
 using osu.Game.Online.Rooms;
@@ -301,7 +303,8 @@ namespace SampleMultiplayerClient
             return Task.CompletedTask;
         }
 
-        public Task MatchmakingJoinLobby() => connection.InvokeAsync(nameof(IMatchmakingServer.MatchmakingJoinLobby));
+        public Task<MatchmakingJoinLobbyResponse> MatchmakingJoinLobbyWithParams(MatchmakingJoinLobbyRequest request)
+            => connection.InvokeAsync<MatchmakingJoinLobbyResponse>(nameof(IMatchmakingServer.MatchmakingJoinLobbyWithParams), request);
 
         public Task MatchmakingLeaveLobby() => connection.InvokeAsync(nameof(IMatchmakingServer.MatchmakingLeaveLobby));
 

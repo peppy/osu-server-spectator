@@ -791,6 +791,16 @@ namespace osu.Server.Spectator.Database
             });
         }
 
+        public async Task<int[]> GetMatchmakingPoolRatingsAsync(uint poolId)
+        {
+            var connection = await getConnectionAsync();
+
+            return (await connection.QueryAsync<int>("SELECT rating FROM matchmaking_user_stats WHERE pool_id = @PoolId", new
+            {
+                PoolId = poolId
+            })).ToArray();
+        }
+
         public void Dispose()
         {
             openConnection?.Dispose();

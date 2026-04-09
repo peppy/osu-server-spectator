@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using osu.Framework.Utils;
 using osu.Game.Online;
 using osu.Game.Online.API;
+using osu.Game.Online.Matchmaking.Requests;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Online.Rooms;
 
@@ -133,7 +134,7 @@ namespace SampleMultiplayerClient
                             break;
 
                         case "mmjoinlobby":
-                            await targetClient.MatchmakingJoinLobby();
+                            await targetClient.MatchmakingJoinLobbyWithParams(new MatchmakingJoinLobbyRequest());
                             break;
 
                         case "mmleavelobby":
