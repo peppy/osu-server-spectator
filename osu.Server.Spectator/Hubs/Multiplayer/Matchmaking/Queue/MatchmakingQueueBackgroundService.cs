@@ -194,7 +194,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
         {
             try
             {
-                await updateLobby();
+                await updateLobbies();
             }
             catch (Exception ex)
             {
@@ -230,7 +230,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
             }
         }
 
-        private async Task updateLobby()
+        private async Task updateLobbies()
         {
             if (DateTimeOffset.Now - lastLobbyUpdateTime < lobby_update_rate)
                 return;
