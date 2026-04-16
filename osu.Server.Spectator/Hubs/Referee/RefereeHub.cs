@@ -151,26 +151,6 @@ namespace osu.Server.Spectator.Hubs.Referee
             }
         }
 
-        public async Task LeaveRoom(long roomId)
-        {
-            using (var userUsage = await refereeStates.GetForUse(Context.GetUserId()))
-            {
-                Debug.Assert(userUsage.Item != null);
-
-                ensureIsReferee(roomId, userUsage);
-
-                using (var roomUsage = await roomController.GetRoom(roomId))
-                {
-                    Debug.Assert(roomUsage.Item != null);
-
-                    await tryKickRefereeFromMultiplayerHub(roomUsage, userUsage.Item.UserId, userUsage.Item.UserId);
-                    await kickRefereeFromRefereeHub(roomUsage, userUsage, userUsage.Item.UserId);
-
-                    await eventDispatcher.PostRefereeRemovedAsync(roomId, userUsage.Item.UserId);
-                }
-            }
-        }
-
         public async Task CloseRoom(long roomId)
         {
             using (var closingUserUsage = await refereeStates.GetForUse(Context.GetUserId()))
@@ -215,7 +195,8 @@ namespace osu.Server.Spectator.Hubs.Referee
                         }
                     }
 
-                    await roomController.LeaveRoom(closingUserUsage.Item, roomUsage);
+                    await roomController.LeaveRoom(closingUserUsage.Item, roomUsage, forceCloseOnEmpty: true);
+                    closingUserUsage.Item.DisassociateFromRoom(roomId);
                 }
             }
         }
@@ -296,8 +277,6 @@ namespace osu.Server.Spectator.Hubs.Referee
             {
                 Debug.Assert(userUsage.Item != null);
 
-                ensureIsReferee(roomId, userUsage);
-
                 using (var roomUsage = await roomController.GetRoom(roomId))
                 {
                     if (roomUsage.Item == null)
@@ -305,6 +284,11 @@ namespace osu.Server.Spectator.Hubs.Referee
 
                     if (targetUserId == userUsage.Item.UserId)
                         ThrowHelper.ThrowCannotPerformOperationOnSelf();
+
+                    // referee addition is unique in that it can only be performed by the room host
+                    // this mirrors bancho
+                    if (userUsage.Item.UserId != roomUsage.Item.Host?.UserID)
+                        ThrowHelper.ThrowUserNotHost();
 
                     if (roomUsage.Item.BannedUsers.Contains(targetUserId))
                         ThrowHelper.ThrowUserBanned();
@@ -332,12 +316,15 @@ namespace osu.Server.Spectator.Hubs.Referee
             {
                 Debug.Assert(userUsage.Item != null);
 
-                ensureIsReferee(roomId, userUsage);
-
                 using (var roomUsage = await roomController.GetRoom(roomId))
                 {
                     if (roomUsage.Item == null)
                         ThrowHelper.ThrowRoomDoesNotExist();
+
+                    // referee removal is unique in that it can only be performed by the room host
+                    // this mirrors bancho
+                    if (userUsage.Item.UserId != roomUsage.Item.Host?.UserID)
+                        ThrowHelper.ThrowUserNotHost();
 
                     if (targetUserId == userUsage.Item.UserId)
                         ThrowHelper.ThrowCannotPerformOperationOnSelf();
@@ -402,10 +389,21 @@ namespace osu.Server.Spectator.Hubs.Referee
                 // user is joined to the room. proceed with a full kick to flush them out.
                 await roomController.KickUserFromRoom(refereeUsage.Item, roomUsage, kickingUserId);
             }
-            else
+
+            // finally, disassociate the referee from the room so they can't join or perform referee actions again.
+            refereeUsage.Item.DisassociateFromRoom(roomUsage.Item.RoomID);
+        }
+
+        public async Task<ListRoomsResponse> ListRooms()
+        {
+            using (var userUsage = await refereeStates.GetForUse(Context.GetUserId()))
             {
-                // user has not joined the room yet or is temporarily disconnected. disassociate them from room so they can't join again.
-                refereeUsage.Item.DisassociateFromRoom(roomUsage.Item.RoomID);
+                Debug.Assert(userUsage.Item != null);
+
+                return new ListRoomsResponse
+                {
+                    RoomIDs = userUsage.Item.RefereedRoomIds.ToArray()
+                };
             }
         }
 
@@ -779,23 +777,9 @@ namespace osu.Server.Spectator.Hubs.Referee
                     return;
                 }
 
-                if (exception != null)
-                {
-                    // if the disconnection isn't clean (due to a networking issue or similar), keep the user's set of refereed rooms intact
-                    // so that they remain referees on all rooms when they reconnect.
-                    // obviously, this is memory state, which is not preserved anywhere else, so it will drop out on server restart.
-                    // additionally, we still unsubscribe the connection from events,
-                    // primarily because only one connection per user ID is supported as written, so the user will need to re-subscribe with a new connection ID when they rejoin anyway.
-                    foreach (long roomId in userUsage.Item.RefereedRoomIds)
-                        await userUsage.Item.UnsubscribeFromEvents(eventDispatcher, roomId);
-
-                    await base.OnDisconnectedAsync(exception);
-                    return;
-                }
-
-                // if the disconnection is clean, it is treated as if the referee wishes to cease being a referee on all their rooms.
-                // in line, perform a full leave.
-                // this will remove the user from the set of referees on all their refereed rooms. the user will not get the referee status back on rejoin.
+                // perform a full leave of all joined rooms.
+                // this will NOT remove the user from the set of referees on all their refereed rooms; they will be permitted to rejoin.
+                // additionally, purposefully leave the user state intact so the referee-room associations are not dropped.
                 foreach (long roomId in userUsage.Item.RefereedRoomIds.ToArray())
                 {
                     using (var roomUsage = await roomController.GetRoom(roomId))
@@ -806,8 +790,6 @@ namespace osu.Server.Spectator.Hubs.Referee
 
                     await eventDispatcher.PostRefereeRemovedAsync(roomId, userUsage.Item.UserId);
                 }
-
-                userUsage.Destroy();
             }
 
             await base.OnDisconnectedAsync(exception);

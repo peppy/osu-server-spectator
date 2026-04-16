@@ -48,13 +48,6 @@ namespace osu.Server.Spectator.Hubs.Referee
         Task<RoomJoinedResponse> JoinRoom(long roomId);
 
         /// <summary>
-        /// Leaves the multiplayer room with the given <paramref name="roomId"/>.
-        /// This operation removes the caller's referee privileges;
-        /// they will not be able to <see cref="JoinRoom"/> again unless granted referee privileges again by another referee in the room.
-        /// </summary>
-        Task LeaveRoom(long roomId);
-
-        /// <summary>
         /// Closes the room with the given <paramref name="roomId"/>.
         /// Corresponds to the <c>!mp close</c> command on bancho.
         /// </summary>
@@ -82,15 +75,21 @@ namespace osu.Server.Spectator.Hubs.Referee
         /// <summary>
         /// Adds the user with the given <paramref name="targetUserId"/> as a referee of the room with the given <paramref name="roomId"/>.
         /// The user has to call <see cref="JoinRoom"/> to start performing referee actions.
+        /// Only the room host can call this method, and they cannot call it on themselves.
         /// </summary>
         Task AddReferee(long roomId, int targetUserId);
 
         /// <summary>
         /// Removes the user with the given <paramref name="targetUserId"/> from the set of referees of the room with the given <paramref name="roomId"/>.
         /// If the user was joined to the room at the time of this call, they will be kicked from the room.
-        /// A user cannot call this method on themselves; for that purpose <see cref="LeaveRoom"/> should be used instead.
+        /// Only the room host can call this method, and they cannot call it on themselves.
         /// </summary>
         Task RemoveReferee(long roomId, int targetUserId);
+
+        /// <summary>
+        /// Lists all rooms that the caller is a referee in.
+        /// </summary>
+        Task<ListRoomsResponse> ListRooms();
 
         /// <summary>
         /// Changes the settings of the room with the given <paramref name="roomId"/>.
