@@ -92,7 +92,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay.Stages
             foreach ((_, RankedPlayUserInfo userInfo) in State.Users)
                 userInfo.DamageInfo = null;
 
-            if (hasGameplayRoundsRemaining())
+            if (HasGameplayRoundsRemaining())
                 await Controller.GotoStage(RankedPlayStage.RoundWarmup);
             else
                 await Controller.GotoStage(RankedPlayStage.Ended);
@@ -101,17 +101,10 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay.Stages
         public override async Task HandleUserLeft(MultiplayerRoomUser user)
         {
             // Allow players to leave early without incurring a loss if they know gameplay won't continue.
-            if (hasGameplayRoundsRemaining())
+            if (HasGameplayRoundsRemaining())
                 await KillUser(user);
 
             // Remain in the results stage, which will naturally transition to the ended stage once the countdown expires.
-        }
-
-        private bool hasGameplayRoundsRemaining()
-        {
-            int countPlayersAlive = State.Users.Count(u => u.Value.Life > 0);
-            int countCardsRemaining = Controller.DeckCount + State.Users.Sum(u => u.Value.Hand.Count);
-            return countPlayersAlive > 1 && countCardsRemaining > 0;
         }
     }
 }
