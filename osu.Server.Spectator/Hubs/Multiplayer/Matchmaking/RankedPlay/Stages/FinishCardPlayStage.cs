@@ -18,7 +18,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay.Stages
         }
 
         protected override RankedPlayStage Stage => RankedPlayStage.FinishCardPlay;
-        protected override TimeSpan Duration => TimeSpan.MaxValue;
+        protected override TimeSpan Duration => TimeSpan.FromMinutes(2);
 
         protected override async Task Begin()
         {
@@ -27,7 +27,20 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay.Stages
 
         protected override async Task Finish()
         {
-            await Controller.GotoStage(RankedPlayStage.GameplayWarmup);
+            if (allPlayersReady())
+                await Controller.GotoStage(RankedPlayStage.GameplayWarmup);
+            else
+            {
+                // Subtract 100K HP from every player that failed to load the beatmap in time.
+                // Although this seems unfair, it means that players are not able to purposefully block the others' picks.
+                foreach (var player in Room.Users.Where(p => p.BeatmapAvailability.State != DownloadState.LocallyAvailable))
+                    State.Users[player.UserID].Life = Math.Max(0, State.Users[player.UserID].Life - 100_000);
+
+                if (HasGameplayRoundsRemaining())
+                    await Controller.GotoStage(RankedPlayStage.RoundWarmup);
+                else
+                    await Controller.GotoStage(RankedPlayStage.Ended);
+            }
         }
 
         public override async Task HandleUserStateChanged(MultiplayerRoomUser user)
@@ -37,9 +50,14 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay.Stages
 
         private async Task continueWhenAllPlayersReady()
         {
-            // Only require players to have the beatmap, but not necessarily have it loaded yet.
-            if (Room.Users.All(u => u.BeatmapAvailability.State == DownloadState.LocallyAvailable))
+            if (allPlayersReady())
                 await Finish();
         }
+
+        /// <summary>
+        /// Only requires players to have the beatmap, but not necessarily have it loaded yet.
+        /// </summary>
+        private bool allPlayersReady()
+            => Room.Users.All(u => u.BeatmapAvailability.State == DownloadState.LocallyAvailable);
     }
 }

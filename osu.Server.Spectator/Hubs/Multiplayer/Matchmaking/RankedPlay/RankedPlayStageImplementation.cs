@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Online.Multiplayer.MatchTypes.RankedPlay;
@@ -132,6 +133,16 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay
         protected async Task CloseMatch()
         {
             await Controller.GotoStage(RankedPlayStage.Ended);
+        }
+
+        /// <summary>
+        /// Whether there are any more gameplay rounds that can be played.
+        /// </summary>
+        protected bool HasGameplayRoundsRemaining()
+        {
+            int countPlayersAlive = State.Users.Count(u => u.Value.Life > 0);
+            int countCardsRemaining = Controller.DeckCount + State.Users.Sum(u => u.Value.Hand.Count);
+            return countPlayersAlive > 1 && countCardsRemaining > 0;
         }
     }
 }

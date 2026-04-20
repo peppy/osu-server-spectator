@@ -18,7 +18,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay.Stages
         }
 
         protected override RankedPlayStage Stage => RankedPlayStage.GameplayWarmup;
-        protected override TimeSpan Duration => TimeSpan.MaxValue;
+        protected override TimeSpan Duration => TimeSpan.FromMinutes(2);
 
         protected override async Task Begin()
         {
@@ -27,7 +27,22 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay.Stages
 
         protected override async Task Finish()
         {
-            await Controller.GotoStage(RankedPlayStage.Gameplay);
+            if (allPlayersReady())
+            {
+                await Controller.GotoStage(RankedPlayStage.Gameplay);
+            }
+            else
+            {
+                // Subtract 100K HP from every player that failed to load the beatmap in time.
+                // Although this seems unfair, it means that players are not able to purposefully block the others' picks.
+                foreach (var player in Room.Users.Where(p => p.BeatmapAvailability.State != DownloadState.LocallyAvailable || p.State != MultiplayerUserState.Ready))
+                    State.Users[player.UserID].Life = Math.Max(0, State.Users[player.UserID].Life - 100_000);
+
+                if (HasGameplayRoundsRemaining())
+                    await Controller.GotoStage(RankedPlayStage.RoundWarmup);
+                else
+                    await Controller.GotoStage(RankedPlayStage.Ended);
+            }
         }
 
         public override async Task HandleUserStateChanged(MultiplayerRoomUser user)
@@ -37,9 +52,14 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay.Stages
 
         private async Task continueWhenAllPlayersReady()
         {
-            // Require players to be in the ready state, signaling they have finished viewing the beatmap details/etc.
-            if (Room.Users.All(u => u.BeatmapAvailability.State == DownloadState.LocallyAvailable && u.State == MultiplayerUserState.Ready))
+            if (allPlayersReady())
                 await FinishWithCountdown(TimeSpan.FromSeconds(10));
         }
+
+        /// <summary>
+        /// Requires all players to be in the ready state, signaling they have finished viewing the beatmap details/etc.
+        /// </summary>
+        private bool allPlayersReady()
+            => Room.Users.All(u => u.BeatmapAvailability.State == DownloadState.LocallyAvailable && u.State == MultiplayerUserState.Ready);
     }
 }
