@@ -24,16 +24,6 @@ namespace osu.Server.Spectator.Tests.RankedPlay.Stages
         }
 
         [Fact]
-        public async Task DoesNotContinueToGameplayWarmupWithoutBeatmapAvailable()
-        {
-            for (int i = 0; i < 5; i++)
-            {
-                await FinishCountdown();
-                Assert.Equal(RankedPlayStage.FinishCardPlay, RoomState.Stage);
-            }
-        }
-
-        [Fact]
         public async Task ContinuesToGameplayWarmupWhenAllPlayersReady()
         {
             await Hub.ChangeBeatmapAvailability(BeatmapAvailability.LocallyAvailable());
@@ -51,6 +41,41 @@ namespace osu.Server.Spectator.Tests.RankedPlay.Stages
 
             Assert.Equal(RankedPlayStage.Ended, RoomState.Stage);
             Assert.Equal(0, UserState.Life);
+        }
+
+        [Fact]
+        public async Task ContinuesToNextRoundWhenAnyPlayerFailsToBecomeReady()
+        {
+            await Hub.ChangeBeatmapAvailability(BeatmapAvailability.LocallyAvailable());
+            Assert.Equal(RankedPlayStage.FinishCardPlay, RoomState.Stage);
+
+            await FinishCountdown();
+            Assert.Equal(RankedPlayStage.CardPlay, RoomState.Stage);
+
+            Assert.Equal(1_000_000, RoomState.Users[USER_ID].Life);
+            Assert.Equal(900_000, RoomState.Users[USER_ID_2].Life);
+        }
+
+        [Fact]
+        public async Task ContinuesToNextRoundWhenAllPlayersFailToBecomeReady()
+        {
+            await FinishCountdown();
+            Assert.Equal(RankedPlayStage.CardPlay, RoomState.Stage);
+
+            Assert.Equal(900_000, RoomState.Users[USER_ID].Life);
+            Assert.Equal(900_000, RoomState.Users[USER_ID_2].Life);
+        }
+
+        [Fact]
+        public async Task ContinuesToEndedWhenPlayerDiesFromFailingToBecomeReady()
+        {
+            RoomState.Users[USER_ID].Life = 50_000;
+
+            await FinishCountdown();
+            Assert.Equal(RankedPlayStage.Ended, RoomState.Stage);
+
+            Assert.Equal(0, RoomState.Users[USER_ID].Life);
+            Assert.Equal(900_000, RoomState.Users[USER_ID_2].Life);
         }
     }
 }
