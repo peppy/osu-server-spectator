@@ -18,63 +18,63 @@ namespace osu.Server.Spectator.Tests.Matchmaking
         [Fact]
         public void OnlyEasyBeatmaps()
         {
-            MatchmakingBeatmapSelector beatmapSelector = new MatchmakingBeatmapSelector(
+            MatchmakingBeatmapSelector beatmapSelector = new MatchmakingBeatmapSelector(new matchmaking_pool(),
                 Enumerable.Range(1, 1000).Select(i => new matchmaking_pool_beatmap
                 {
-                    id = (uint)i,
+                    beatmap_id = i,
                     rating = 1000,
-                }).ToArray());
+                }).ToArray(), new Mock<IDatabaseFactory>().Object);
 
             matchmaking_pool_beatmap[] result = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
             Assert.Equal(50, result.Length);
 
             matchmaking_pool_beatmap[] result2 = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
-            Assert.NotEqual(result.OrderBy(b => b.id), result2.OrderBy(b => b.id));
+            Assert.NotEqual(result.OrderBy(b => b.beatmap_id), result2.OrderBy(b => b.beatmap_id));
         }
 
         [Fact]
         public void OnlyAverageBeatmaps()
         {
-            MatchmakingBeatmapSelector beatmapSelector = new MatchmakingBeatmapSelector(
+            MatchmakingBeatmapSelector beatmapSelector = new MatchmakingBeatmapSelector(new matchmaking_pool(),
                 Enumerable.Range(1, 1000).Select(i => new matchmaking_pool_beatmap
                 {
-                    id = (uint)i,
+                    beatmap_id = i,
                     rating = 1500,
-                }).ToArray());
+                }).ToArray(), new Mock<IDatabaseFactory>().Object);
 
             matchmaking_pool_beatmap[] result = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
             Assert.Equal(50, result.Length);
 
             matchmaking_pool_beatmap[] result2 = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
-            Assert.NotEqual(result.OrderBy(b => b.id), result2.OrderBy(b => b.id));
+            Assert.NotEqual(result.OrderBy(b => b.beatmap_id), result2.OrderBy(b => b.beatmap_id));
         }
 
         [Fact]
         public void OnlyHardBeatmaps()
         {
-            MatchmakingBeatmapSelector beatmapSelector = new MatchmakingBeatmapSelector(
+            MatchmakingBeatmapSelector beatmapSelector = new MatchmakingBeatmapSelector(new matchmaking_pool(),
                 Enumerable.Range(1, 1000).Select(i => new matchmaking_pool_beatmap
                 {
-                    id = (uint)i,
+                    beatmap_id = i,
                     rating = 2000,
-                }).ToArray());
+                }).ToArray(), new Mock<IDatabaseFactory>().Object);
 
             matchmaking_pool_beatmap[] result = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
             Assert.Equal(50, result.Length);
 
             matchmaking_pool_beatmap[] result2 = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
-            Assert.NotEqual(result.OrderBy(b => b.id), result2.OrderBy(b => b.id));
+            Assert.NotEqual(result.OrderBy(b => b.beatmap_id), result2.OrderBy(b => b.beatmap_id));
         }
 
         [Fact]
         public void WideSelection()
         {
-            MatchmakingBeatmapSelector beatmapSelector = new MatchmakingBeatmapSelector(
+            MatchmakingBeatmapSelector beatmapSelector = new MatchmakingBeatmapSelector(new matchmaking_pool(),
                 Enumerable.Range(1, 1000).Select(i => new matchmaking_pool_beatmap
                 {
-                    id = (uint)i,
+                    beatmap_id = i,
                     rating = 1000 + i,
-                }).ToArray());
+                }).ToArray(), new Mock<IDatabaseFactory>().Object);
 
             matchmaking_pool_beatmap[] result = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
             int countEasy = result.Count(b => b.rating < 1500);
@@ -85,23 +85,23 @@ namespace osu.Server.Spectator.Tests.Matchmaking
             Assert.True((double)countHard / result.Length >= 0.25);
 
             matchmaking_pool_beatmap[] result2 = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
-            Assert.NotEqual(result.OrderBy(b => b.id), result2.OrderBy(b => b.id));
+            Assert.NotEqual(result.OrderBy(b => b.beatmap_id), result2.OrderBy(b => b.beatmap_id));
         }
 
         [Fact]
         public void NoDuplicates()
         {
-            MatchmakingBeatmapSelector selector = new MatchmakingBeatmapSelector(
+            MatchmakingBeatmapSelector selector = new MatchmakingBeatmapSelector(new matchmaking_pool(),
             [
-                new matchmaking_pool_beatmap { id = 0, rating = 1000 },
-                new matchmaking_pool_beatmap { id = 1, rating = 1000 },
-            ]);
+                new matchmaking_pool_beatmap { beatmap_id = 0, rating = 1000 },
+                new matchmaking_pool_beatmap { beatmap_id = 1, rating = 1000 },
+            ], new Mock<IDatabaseFactory>().Object);
 
             matchmaking_pool_beatmap[] result = selector.GetAppropriateBeatmaps(50, [new EloRating(1000, 350), new EloRating(1000, 350)]);
 
             Assert.Equal(2, result.Length);
-            Assert.Single(result, t => t.id == 0);
-            Assert.Single(result, t => t.id == 1);
+            Assert.Single(result, t => t.beatmap_id == 0);
+            Assert.Single(result, t => t.beatmap_id == 1);
         }
 
         [Fact]

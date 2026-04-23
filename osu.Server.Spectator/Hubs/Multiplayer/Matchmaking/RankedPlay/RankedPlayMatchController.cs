@@ -12,6 +12,7 @@ using osu.Game.Online.RankedPlay;
 using osu.Game.Online.Rooms;
 using osu.Server.Spectator.Database;
 using osu.Server.Spectator.Database.Models;
+using osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Elo;
 using osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue;
 using osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay.Stages;
 
@@ -52,6 +53,8 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay
         /// All users participating in this match ordered by their turn order.
         /// </summary>
         public int[] UserIdsByTurnOrder { get; private set; } = [];
+
+        public Dictionary<int, EloRating> RatingByUser { get; private set; } = [];
 
         /// <summary>
         /// Mapping of cards to their associated effect.
@@ -112,6 +115,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay
             // Create the user states.
             foreach (var user in users)
             {
+                RatingByUser[user.UserId] = user.Rating;
                 State.Users[user.UserId] = new RankedPlayUserInfo
                 {
                     Rating = (int)Math.Round(user.Rating.Mu)
