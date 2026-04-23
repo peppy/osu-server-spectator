@@ -7,8 +7,10 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using osu.Game.Online;
 using osu.Game.Online.Multiplayer;
 using osu.Server.Spectator.Entities;
 using osu.Server.Spectator.Hubs;
@@ -30,12 +32,18 @@ namespace osu.Server.Spectator
 
         private readonly List<IEntityStore> dependentStores = new List<IEntityStore>();
         private readonly EntityStore<ServerMultiplayerRoom> roomStore;
+        private readonly IHubContext<MetadataHub> metadataHub;
+        private readonly IHubContext<MultiplayerHub> multiplayerHub;
+        private readonly IHubContext<SpectatorHub> spectatorHub;
         private readonly BuildUserCountUpdater buildUserCountUpdater;
         private readonly ILogger logger;
 
         public GracefulShutdownManager(
             EntityStore<ServerMultiplayerRoom> roomStore,
             EntityStore<SpectatorClientState> clientStateStore,
+            IHubContext<MetadataHub> metadataHub,
+            IHubContext<MultiplayerHub> multiplayerHub,
+            IHubContext<SpectatorHub> spectatorHub,
             IHostApplicationLifetime hostApplicationLifetime,
             ScoreUploader scoreUploader,
             EntityStore<ConnectionState> connectionStateStore,
@@ -44,6 +52,11 @@ namespace osu.Server.Spectator
             ILoggerFactory loggerFactory)
         {
             this.roomStore = roomStore;
+
+            this.metadataHub = metadataHub;
+            this.multiplayerHub = multiplayerHub;
+            this.spectatorHub = spectatorHub;
+
             this.buildUserCountUpdater = buildUserCountUpdater;
             logger = loggerFactory.CreateLogger(nameof(GracefulShutdownManager));
 
@@ -70,6 +83,9 @@ namespace osu.Server.Spectator
 
             foreach (var store in dependentStores)
                 store.StopAcceptingEntities();
+
+            foreach (var clients in new[] { metadataHub.Clients, spectatorHub.Clients, multiplayerHub.Clients })
+                clients.All.SendCoreAsync(nameof(IStatefulUserHubClient.ServerShuttingDown), Array.Empty<object>());
 
             performOnAllRooms(async r =>
             {
