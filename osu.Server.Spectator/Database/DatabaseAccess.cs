@@ -751,7 +751,7 @@ namespace osu.Server.Spectator.Database
                                                                   + "AND b.deleted_at IS NULL "
                                                                   + "AND s.download_disabled_url IS NULL "
                                                                   + "AND b.approved BETWEEN 1 AND 2 "
-                                                                  + "AND b.hit_length BETWEEN 60 AND 240 "
+                                                                  + "AND b.hit_length BETWEEN 60 AND 300 "
                                                                   + variantString,
                 new
                 {
