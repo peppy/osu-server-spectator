@@ -40,13 +40,12 @@ namespace osu.Server.Spectator
 
         public GracefulShutdownManager(
             EntityStore<ServerMultiplayerRoom> roomStore,
-            EntityStore<SpectatorClientState> clientStateStore,
+            EntityStore<SpectatorClientState> spectatorState,
             IHubContext<MetadataHub> metadataHub,
             IHubContext<MultiplayerHub> multiplayerHub,
             IHubContext<SpectatorHub> spectatorHub,
             IHostApplicationLifetime hostApplicationLifetime,
             ScoreUploader scoreUploader,
-            EntityStore<ConnectionState> connectionStateStore,
             EntityStore<MetadataClientState> metadataClientStore,
             BuildUserCountUpdater buildUserCountUpdater,
             ILoggerFactory loggerFactory)
@@ -61,13 +60,12 @@ namespace osu.Server.Spectator
             logger = loggerFactory.CreateLogger(nameof(GracefulShutdownManager));
 
             dependentStores.Add(roomStore);
-            dependentStores.Add(clientStateStore);
+            dependentStores.Add(spectatorState);
             dependentStores.Add(scoreUploader);
-            dependentStores.Add(connectionStateStore);
             dependentStores.Add(metadataClientStore);
 
             // Importantly, we don't block on `MultiplayerClientState` because they're only relevant as long as a `ServerMultiplayerRoom` exists in the first place.
-            // More so, we want to allow these states to be created so existing rooms can continue to function until they are disbanded.
+            // More so, we want to allow these states to be created so existing rooms can continue to function until they are disbanded (see `StopAcceptingEntities`).
             // Same logic applies to `RefereeClientState`.
 
             hostApplicationLifetime.ApplicationStopping.Register(shutdownSafely);
@@ -95,7 +93,7 @@ namespace osu.Server.Spectator
                 });
             }).Wait();
 
-            TimeSpan timeWaited = new TimeSpan();
+            TimeSpan timeWaited = TimeSpan.Zero;
             TimeSpan timeBetweenChecks = TimeSpan.FromSeconds(10);
 
             var stringBuilder = new StringBuilder();
