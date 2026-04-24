@@ -90,7 +90,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
             if (!poolSelectors.TryGetValue(poolId, out MatchmakingBeatmapSelector? selector))
                 poolSelectors[poolId] = selector = await MatchmakingBeatmapSelector.Initialise(queue.Pool, databaseFactory);
 
-            selector.AdjustRating(new MatchmakingBeatmapSelector.BeatmapLookupKey(beatmapId, mods.Length == 0 ? string.Empty : JsonConvert.SerializeObject(mods)), scores, ratings);
+            await selector.AdjustRating(new MatchmakingBeatmapSelector.BeatmapLookupKey(beatmapId, mods.Length == 0 ? string.Empty : JsonConvert.SerializeObject(mods)), scores, ratings);
         }
 
         public bool IsInQueue(MultiplayerClientState state)
