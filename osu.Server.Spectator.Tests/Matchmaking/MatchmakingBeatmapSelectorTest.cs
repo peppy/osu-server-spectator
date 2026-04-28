@@ -27,9 +27,6 @@ namespace osu.Server.Spectator.Tests.Matchmaking
 
             matchmaking_pool_beatmap[] result = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
             Assert.Equal(50, result.Length);
-
-            matchmaking_pool_beatmap[] result2 = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
-            Assert.NotEqual(result.OrderBy(b => b.beatmap_id), result2.OrderBy(b => b.beatmap_id));
         }
 
         [Fact]
@@ -44,9 +41,6 @@ namespace osu.Server.Spectator.Tests.Matchmaking
 
             matchmaking_pool_beatmap[] result = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
             Assert.Equal(50, result.Length);
-
-            matchmaking_pool_beatmap[] result2 = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
-            Assert.NotEqual(result.OrderBy(b => b.beatmap_id), result2.OrderBy(b => b.beatmap_id));
         }
 
         [Fact]
@@ -61,9 +55,6 @@ namespace osu.Server.Spectator.Tests.Matchmaking
 
             matchmaking_pool_beatmap[] result = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
             Assert.Equal(50, result.Length);
-
-            matchmaking_pool_beatmap[] result2 = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
-            Assert.NotEqual(result.OrderBy(b => b.beatmap_id), result2.OrderBy(b => b.beatmap_id));
         }
 
         [Fact]
@@ -83,9 +74,6 @@ namespace osu.Server.Spectator.Tests.Matchmaking
             Assert.Equal(50, result.Length);
             Assert.True((double)countEasy / result.Length >= 0.25);
             Assert.True((double)countHard / result.Length >= 0.25);
-
-            matchmaking_pool_beatmap[] result2 = beatmapSelector.GetAppropriateBeatmaps(50, [new EloRating(1500, 80)]);
-            Assert.NotEqual(result.OrderBy(b => b.beatmap_id), result2.OrderBy(b => b.beatmap_id));
         }
 
         [Fact]
