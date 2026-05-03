@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Database;
+using osu.Game.Online.Multiplayer;
 using osu.Game.Online.Spectator;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -201,6 +202,12 @@ namespace osu.Server.Spectator.Hubs.Spectator
 
         public async Task StartWatchingUser(int userId)
         {
+            using (var db = databaseFactory.GetInstance())
+            {
+                if (await db.IsUserRestrictedAsync(Context.GetUserId()))
+                    throw new InvalidStateException("Can't spectate a user when restricted.");
+            }
+
             Log($"Watching {userId}");
 
             try
