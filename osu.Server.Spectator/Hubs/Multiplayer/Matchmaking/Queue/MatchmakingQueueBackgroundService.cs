@@ -170,8 +170,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
 
             using (var db = databaseFactory.GetInstance())
             {
-                if (await db.IsUserRestrictedAsync(state.UserId))
-                    throw new InvalidStateException("Can't duel when restricted.");
+                await MultiplayerHub.EnsureInviteValid(db, state.UserId, request.UserId);
 
                 matchmaking_pool pool = await db.GetMatchmakingPoolAsync((uint)request.PoolId) ?? throw new InvalidStateException($"Pool not found: {request.PoolId}");
                 pool.lobby_size = 2;
