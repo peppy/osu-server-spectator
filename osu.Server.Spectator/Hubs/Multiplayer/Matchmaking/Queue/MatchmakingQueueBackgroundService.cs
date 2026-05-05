@@ -39,6 +39,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
 
         private const string statsd_prefix = "matchmaking";
         private static string queue_ban_end_time(int userId) => $"matchmaking-ban-end-time:{userId}";
+        private static string last_duel_issue_time(int userId) => $"matchmaking-duel-issue-time:{userId}";
 
         private readonly ConcurrentDictionary<int, MatchmakingLobby> poolLobbies = new ConcurrentDictionary<int, MatchmakingLobby>();
         private readonly ConcurrentDictionary<int, MatchmakingQueue> poolQueues = new ConcurrentDictionary<int, MatchmakingQueue>();
@@ -141,9 +142,6 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
 
             using (var db = databaseFactory.GetInstance())
             {
-                if (await db.IsUserRestrictedAsync(state.UserId))
-                    throw new InvalidStateException("Can't queue when restricted.");
-
                 matchmaking_pool pool = await db.GetMatchmakingPoolAsync((uint)poolId) ?? throw new InvalidStateException($"Pool not found: {poolId}");
 
                 if (!pool.active)
@@ -165,14 +163,18 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
 
         public async Task<MatchmakingIssueDuelResponse> IssueDuelAsync(MultiplayerClientState state, MatchmakingIssueDuelRequest request)
         {
+            DateTimeOffset lastIssueTime = memoryCache.Get<DateTimeOffset?>(last_duel_issue_time(state.UserId)) ?? DateTimeOffset.MinValue;
+
+            if (DateTimeOffset.Now - lastIssueTime < TimeSpan.FromSeconds(30))
+                throw new InvalidStateException("You are requesting too many duels. Slow down.");
+
+            memoryCache.Set(last_duel_issue_time(state.UserId), DateTimeOffset.Now);
+
             // Users should only ever be in one queue at a time.
             await RemoveFromQueueAsync(state);
 
             using (var db = databaseFactory.GetInstance())
             {
-                if (await db.IsUserRestrictedAsync(state.UserId))
-                    throw new InvalidStateException("Can't duel when restricted.");
-
                 matchmaking_pool pool = await db.GetMatchmakingPoolAsync((uint)request.PoolId) ?? throw new InvalidStateException($"Pool not found: {request.PoolId}");
                 pool.lobby_size = 2;
                 pool.rating_search_radius = int.MaxValue;
