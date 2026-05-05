@@ -22,14 +22,14 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
         public TimeSpan InviteTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
         /// <summary>
+        /// The time before users are removed from the queue if they haven't been paired up.
+        /// </summary>
+        public TimeSpan SearchTimeout { get; set; } = TimeSpan.MaxValue;
+
+        /// <summary>
         /// The system clock.
         /// </summary>
         public ISystemClock Clock { get; set; } = new SystemClock();
-
-        /// <summary>
-        /// The duration for which users are temporarily banned from the matchmaking queue after declining an invitation.
-        /// </summary>
-        public TimeSpan BanDuration { get; set; } = AppSettings.MatchmakingQueueBanDuration;
 
         /// <summary>
         /// All users active in the matchmaking queue.
@@ -228,15 +228,25 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
                     bundle.FormedGroups.Add(group);
                 }
 
-                List<MatchmakingQueueUser> timedOutUsers = [];
+                List<MatchmakingQueueUser> inviteTimeoutUsers = [];
 
                 foreach (var user in matchmakingUsers.Where(u => u.Group != null && !u.InviteAccepted))
                 {
                     if (Clock.UtcNow - user.InviteStartTime > InviteTimeout)
-                        timedOutUsers.Add(user);
+                        inviteTimeoutUsers.Add(user);
                 }
 
-                bundle.Append(removeFromQueue(timedOutUsers, true));
+                bundle.Append(removeFromQueue(inviteTimeoutUsers, true));
+
+                List<MatchmakingQueueUser> searchTimeoutUsers = [];
+
+                foreach (var user in matchmakingUsers.Where(u => u.Group == null))
+                {
+                    if (Clock.UtcNow - user.SearchStartTime > SearchTimeout)
+                        searchTimeoutUsers.Add(user);
+                }
+
+                bundle.Append(removeFromQueue(searchTimeoutUsers, false));
             }
 
             return bundle;
@@ -289,7 +299,7 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.Queue
         private IEnumerable<MatchmakingQueueUser[]> matchUsers()
         {
             List<MatchmakingQueueUser> availableUsers = matchmakingUsers.Where(u => u.Group == null)
-                                                                        .Where(u => Clock.UtcNow - u.QueueBanStartTime > BanDuration)
+                                                                        .Where(u => u.BanEndTime < Clock.UtcNow)
                                                                         .OrderBy(u => u.Rating.Mu)
                                                                         .ToList();
 

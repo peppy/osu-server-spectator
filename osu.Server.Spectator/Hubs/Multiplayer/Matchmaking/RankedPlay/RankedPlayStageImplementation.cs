@@ -123,8 +123,14 @@ namespace osu.Server.Spectator.Hubs.Multiplayer.Matchmaking.RankedPlay
         /// </summary>
         protected async Task KillUser(MultiplayerRoomUser user)
         {
+            if (Controller.Ranked)
+                Controller.MatchmakingService.BanUser(user.UserID, TimeSpan.FromMinutes(10));
+
             State.Users[user.UserID].Life = 0;
             await EventDispatcher.PostMatchRoomStateChangedAsync(Room);
+
+            if (!HasGameplayRoundsRemaining())
+                await Controller.HandleMatchCompleted();
         }
 
         /// <summary>

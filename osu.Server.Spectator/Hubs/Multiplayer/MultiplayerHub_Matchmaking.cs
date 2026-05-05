@@ -61,6 +61,12 @@ namespace osu.Server.Spectator.Hubs.Multiplayer
 
         public async Task MatchmakingJoinQueue(int poolId)
         {
+            using (var db = databaseFactory.GetInstance())
+            {
+                if (await db.IsUserRestrictedAsync(Context.GetUserId()))
+                    throw new InvalidStateException("Can't queue when restricted.");
+            }
+
             using (var userUsage = await GetOrCreateLocalUserState())
                 await matchmakingQueueService.AddToQueueAsync(userUsage.Item!, poolId);
         }
@@ -75,6 +81,26 @@ namespace osu.Server.Spectator.Hubs.Multiplayer
         {
             using (var userUsage = await GetOrCreateLocalUserState())
                 await matchmakingQueueService.AcceptInvitationAsync(userUsage.Item!);
+        }
+
+        public async Task<MatchmakingIssueDuelResponse> MatchmakingIssueDuel(MatchmakingIssueDuelRequest request)
+        {
+            using (var db = databaseFactory.GetInstance())
+            {
+                if (await db.IsUserRestrictedAsync(Context.GetUserId()))
+                    throw new InvalidStateException("Can't duel when restricted.");
+            }
+
+            await checkUserToUserPermissionsAsync(request.UserId);
+
+            using (var userUsage = await GetOrCreateLocalUserState())
+                return await matchmakingQueueService.IssueDuelAsync(userUsage.Item!, request);
+        }
+
+        public async Task<MatchmakingAcceptDuelResponse> MatchmakingAcceptDuel(MatchmakingAcceptDuelRequest request)
+        {
+            using (var userUsage = await GetOrCreateLocalUserState())
+                return await matchmakingQueueService.AcceptDuelAsync(userUsage.Item!, request);
         }
 
         public async Task MatchmakingDeclineInvitation()
